@@ -1,8 +1,7 @@
-import os
-import uuid
-from typing import List
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+from app.api.endpoints import router as api_router
 
 app = FastAPI(
     title="CV-Match AI - API",
@@ -19,66 +18,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = "temp_storage"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# Registrar todas las rutas agrupadas en el router modular
+app.include_router(api_router)
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        openapi_version="3.0.3",
+    )
+    body_schema = openapi_schema["paths"]["/upload-cv/"]["post"]["requestBody"]["content"]["multipart/form-data"]["schema"]
+    if "$ref" in body_schema:
+        schema_name = body_schema["$ref"].rsplit("/", 1)[-1]
+        body_schema = openapi_schema["components"]["schemas"][schema_name]
+    files_schema = body_schema["properties"]["files"]
+    files_schema["items"] = {"type": "string", "format": "binary"}
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 @app.get("/")
 def read_root():
-    return {"message": "Bienvenido a la API de CV-Match AI"}
-
-@app.post("/upload-cv/")
-async def upload_cvs(files: List[UploadFile] = File(...)):
-    if len(files) > 20:
-        raise HTTPException(
-            status_code=400,
-            detail="Se permite un máximo de 20 archivos PDF por carga."
-        )
-    
-    uploaded_results = []
-    
-    for file in files:
-        # 1. Validar extensión
-        if not file.filename.lower().endswith(".pdf"):
-            uploaded_results.append({
-                "filename": file.filename,
-                "status": "error",
-                "message": "El archivo debe estar en formato PDF."
-            })
-            continue
-        
-        # 2. Validar firma binaria (%PDF)
-        contents = await file.read()
-        if not contents.startswith(b"%PDF"):
-            uploaded_results.append({
-                "filename": file.filename,
-                "status": "error",
-                "message": "El archivo no es un PDF válido o está corrupto."
-            })
-            continue
-        
-        # 3. Validar tamaño (10 MB máximo)
-        if len(contents) > 10 * 1024 * 1024:
-            uploaded_results.append({
-                "filename": file.filename,
-                "status": "error",
-                "message": "El archivo excede el tamaño máximo de 10 MB."
-            })
-            continue
-        
-        # 4. Guardar archivo con identificador único
-        file_id = str(uuid.uuid4())
-        file_path = os.path.join(UPLOAD_DIR, f"{file_id}.pdf")
-        with open(file_path, "wb") as f:
-            f.write(contents)
-            
-        uploaded_results.append({
-            "file_id": file_id,
-            "filename": file.filename,
-            "status": "success",
-            "message": "Archivo cargado y almacenado correctamente."
-        })
-        
-    return {
-        "total_processed": len(files),
-        "results": uploaded_results
-    }
+    return {"message": "Bienvenido a la API de CV-Match AI 🚀"}

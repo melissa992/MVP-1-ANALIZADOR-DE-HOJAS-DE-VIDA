@@ -1,0 +1,22 @@
+# Python / Entorno virtual
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Almacenamiento temporal de PDFs (Backend)
+temp_storage/
+
+# Node.js / Frontend
+node_modules/
+dist/
+build/
+.vite/
+
+# Entornos y variables de entorno
+.env
+.env.*
+!.env.example
+.DS_Store
