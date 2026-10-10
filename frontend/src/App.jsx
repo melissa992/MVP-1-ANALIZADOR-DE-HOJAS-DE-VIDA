@@ -6,6 +6,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [responseResult, setResponseResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [extractionView, setExtractionView] = useState(null);
+  const [extractingFileId, setExtractingFileId] = useState(null);
 
   const handleFileSelect = (e) => {
     const selected = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
@@ -20,6 +22,7 @@ function App() {
     setErrorMsg('');
     setFiles(selected);
     setResponseResult(null);
+    setExtractionView(null);
   };
 
   const handleDrop = (e) => {
@@ -32,6 +35,7 @@ function App() {
     setErrorMsg('');
     setFiles(dropped);
     setResponseResult(null);
+    setExtractionView(null);
   };
 
   const handleUpload = async () => {
@@ -58,6 +62,25 @@ function App() {
       setErrorMsg(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExtractText = async (uploadedFile) => {
+    setExtractionView({ filename: uploadedFile.filename, loading: true });
+    setExtractingFileId(uploadedFile.file_id);
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/extract-text/${encodeURIComponent(uploadedFile.file_id)}`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No fue posible extraer el texto.');
+
+      setExtractionView({ filename: uploadedFile.filename, data });
+    } catch (err) {
+      setExtractionView({ filename: uploadedFile.filename, error: err.message });
+    } finally {
+      setExtractingFileId(null);
     }
   };
 
@@ -168,8 +191,29 @@ function App() {
 
             {responseResult && (
               <div className="result-panel">
-                <h3><span className="success-dot" /> Proceso completado con éxito</h3>
-                <pre>{JSON.stringify(responseResult, null, 2)}</pre>
+                <h3><span className="success-dot" /> Resultado de la carga</h3>
+                <div className="uploaded-results">
+                  {(responseResult.results || []).map((uploadedFile, index) => (
+                    <div className="uploaded-file-row" key={uploadedFile.file_id || `${uploadedFile.filename}-${index}`}>
+                      <span className={`file-type-icon ${uploadedFile.status === 'error' ? 'file-type-error' : ''}`} aria-hidden="true">
+                        {uploadedFile.status === 'success' ? 'PDF' : '!'}
+                      </span>
+                      <span className="uploaded-file-name" title={uploadedFile.filename}>{uploadedFile.filename}</span>
+                      {uploadedFile.status === 'success' ? (
+                        <button
+                          type="button"
+                          className="extract-button"
+                          onClick={() => handleExtractText(uploadedFile)}
+                          disabled={Boolean(extractingFileId)}
+                        >
+                          {extractingFileId === uploadedFile.file_id ? 'Extrayendo...' : 'Ver texto extraído'}
+                        </button>
+                      ) : (
+                        <span className="upload-status-error" title={uploadedFile.message}>No se pudo cargar</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </section>
@@ -198,6 +242,72 @@ function App() {
         <span>CV-Match AI</span>
         <span>Herramientas para una selección más ágil</span>
       </footer>
+
+      {extractionView && (
+        <div className="modal-backdrop" onClick={() => setExtractionView(null)}>
+          <section
+            className="extraction-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="extraction-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dialog-heading">
+              <div>
+                <p className="dialog-eyebrow">LECTURA DEL DOCUMENTO</p>
+                <h2 id="extraction-title">Texto extraído</h2>
+              </div>
+              <button type="button" className="dialog-close" onClick={() => setExtractionView(null)} aria-label="Cerrar ventana">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <p className="dialog-filename" title={extractionView.filename}>{extractionView.filename}</p>
+
+            {extractionView.loading && (
+              <div className="extraction-loading">
+                <span className="spinner extraction-spinner" aria-hidden="true" />
+                <span>Extrayendo texto del currículum...</span>
+              </div>
+            )}
+
+            {extractionView.error && (
+              <div className="error-message extraction-error" role="alert">
+                <span className="error-icon" aria-hidden="true">!</span>
+                {extractionView.error}
+              </div>
+            )}
+
+            {extractionView.data && (
+              <>
+                <div className="extraction-meta">
+                  <span className={`extraction-status ${extractionView.data.status === 'warning' ? 'is-warning' : 'is-success'}`}>
+                    <span />
+                    {extractionView.data.status === 'warning' ? 'Revisión necesaria' : 'Extracción completada'}
+                  </span>
+                  {Number.isInteger(extractionView.data.total_pages) && (
+                    <span>{extractionView.data.total_pages} {extractionView.data.total_pages === 1 ? 'página' : 'páginas'}</span>
+                  )}
+                </div>
+                {extractionView.data.message && (
+                  <p className="extraction-notice">{extractionView.data.message}</p>
+                )}
+                <pre className="extracted-text">
+                  {extractionView.data.extracted_text || 'No se encontró texto seleccionable en este documento.'}
+                </pre>
+                {extractionView.data.pages_summary?.length > 0 && (
+                  <div className="page-summary">
+                    {extractionView.data.pages_summary.map((page) => (
+                      <span key={page.page}>Página {page.page}: {page.text_length} caracteres</span>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }
