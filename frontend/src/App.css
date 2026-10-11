@@ -500,6 +500,14 @@
   white-space: nowrap;
 }
 
+.file-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .file-type-error {
   border-color: #efd5ce;
   color: #a45a49;
@@ -523,6 +531,12 @@
 .extract-button:hover:not(:disabled) {
   border-color: #9db9a4;
   background: #eaf2eb;
+}
+
+.extract-button-secondary {
+  color: #66756b;
+  border-color: #e5ebe6;
+  background: #fff;
 }
 
 .extract-button:disabled {
@@ -708,6 +722,212 @@
 
 .extraction-error {
   margin: 0 0 8px;
+}
+
+.profile-dialog {
+  width: min(880px, 100%);
+}
+
+.profile-content {
+  min-height: 0;
+  overflow: auto;
+}
+
+.profile-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid #e5ebe6;
+}
+
+.profile-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #477056;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.view-toggle {
+  padding: 8px 10px;
+  border: 1px solid #cbdace;
+  border-radius: 4px;
+  color: #3d6a4e;
+  background: #f4f8f4;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.view-toggle:hover,
+.view-toggle.is-active {
+  border-color: #315e50;
+  color: #fff;
+  background: #315e50;
+}
+
+.profile-sections {
+  display: grid;
+  gap: 18px;
+}
+
+.profile-section {
+  padding: 15px;
+  border: 1px solid #e5ebe6;
+  border-radius: 6px;
+  background: #fcfdfc;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+
+.section-kicker {
+  color: #7b897f;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  white-space: nowrap;
+}
+
+.section-rule {
+  height: 1px;
+  flex: 1;
+  background: #e5ebe6;
+}
+
+.identity-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.identity-grid div {
+  min-width: 0;
+}
+
+.identity-grid span,
+.identity-grid strong {
+  display: block;
+}
+
+.identity-grid span {
+  margin-bottom: 5px;
+  color: #8a968e;
+  font-size: 9px;
+}
+
+.identity-grid strong {
+  overflow: hidden;
+  color: #34443a;
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-summary {
+  margin: 15px 0 0;
+  padding-top: 13px;
+  border-top: 1px solid #e9eeea;
+  color: #68776d;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.profile-tag {
+  padding: 6px 8px;
+  border: 1px solid #d6e4d9;
+  border-radius: 4px;
+  color: #477056;
+  background: #f2f7f3;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.timeline-list {
+  display: grid;
+  gap: 15px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline-list > li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.timeline-index {
+  color: #b18a64;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.timeline-list strong,
+.timeline-company {
+  display: block;
+}
+
+.timeline-list strong {
+  color: #34443a;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.timeline-company {
+  margin-top: 3px;
+  color: #77847b;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.timeline-list ul {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding-left: 15px;
+  color: #68776d;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.profile-empty {
+  margin: 0;
+  color: #8a968e;
+  font-size: 11px;
+}
+
+.profile-json {
+  max-height: 58vh;
+  overflow: auto;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid #dce7df;
+  border-radius: 5px;
+  color: #43544a;
+  background: #f5f8f5;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .guidance-panel {
@@ -941,6 +1161,29 @@
   .extract-button {
     padding: 7px 8px;
     font-size: 9px;
+  }
+
+  .uploaded-file-row {
+    align-items: flex-start;
+  }
+
+  .file-actions {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 39px;
+  }
+
+  .identity-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .view-toggle {
+    width: 100%;
   }
 }
 

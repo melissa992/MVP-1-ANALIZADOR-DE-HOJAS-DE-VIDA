@@ -8,6 +8,9 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [extractionView, setExtractionView] = useState(null);
   const [extractingFileId, setExtractingFileId] = useState(null);
+  const [profileView, setProfileView] = useState(null);
+  const [analyzingFileId, setAnalyzingFileId] = useState(null);
+  const [showRawProfile, setShowRawProfile] = useState(false);
 
   const handleFileSelect = (e) => {
     const selected = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
@@ -23,6 +26,7 @@ function App() {
     setFiles(selected);
     setResponseResult(null);
     setExtractionView(null);
+    setProfileView(null);
   };
 
   const handleDrop = (e) => {
@@ -36,6 +40,7 @@ function App() {
     setFiles(dropped);
     setResponseResult(null);
     setExtractionView(null);
+    setProfileView(null);
   };
 
   const handleUpload = async () => {
@@ -81,6 +86,26 @@ function App() {
       setExtractionView({ filename: uploadedFile.filename, error: err.message });
     } finally {
       setExtractingFileId(null);
+    }
+  };
+
+  const handleAnalyzeProfile = async (uploadedFile) => {
+    setProfileView({ filename: uploadedFile.filename, loading: true });
+    setAnalyzingFileId(uploadedFile.file_id);
+    setShowRawProfile(false);
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/analyze-cv/${encodeURIComponent(uploadedFile.file_id)}`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'No fue posible analizar el CV.');
+
+      setProfileView({ filename: uploadedFile.filename, data });
+    } catch (err) {
+      setProfileView({ filename: uploadedFile.filename, error: err.message });
+    } finally {
+      setAnalyzingFileId(null);
     }
   };
 
@@ -200,14 +225,24 @@ function App() {
                       </span>
                       <span className="uploaded-file-name" title={uploadedFile.filename}>{uploadedFile.filename}</span>
                       {uploadedFile.status === 'success' ? (
-                        <button
-                          type="button"
-                          className="extract-button"
-                          onClick={() => handleExtractText(uploadedFile)}
-                          disabled={Boolean(extractingFileId)}
-                        >
-                          {extractingFileId === uploadedFile.file_id ? 'Extrayendo...' : 'Ver texto extraído'}
-                        </button>
+                        <div className="file-actions">
+                          <button
+                            type="button"
+                            className="extract-button"
+                            onClick={() => handleAnalyzeProfile(uploadedFile)}
+                            disabled={Boolean(extractingFileId || analyzingFileId)}
+                          >
+                            {analyzingFileId === uploadedFile.file_id ? 'Analizando...' : 'Analizar con IA'}
+                          </button>
+                          <button
+                            type="button"
+                            className="extract-button extract-button-secondary"
+                            onClick={() => handleExtractText(uploadedFile)}
+                            disabled={Boolean(extractingFileId || analyzingFileId)}
+                          >
+                            {extractingFileId === uploadedFile.file_id ? 'Extrayendo...' : 'Ver texto extraído'}
+                          </button>
+                        </div>
                       ) : (
                         <span className="upload-status-error" title={uploadedFile.message}>No se pudo cargar</span>
                       )}
@@ -304,6 +339,110 @@ function App() {
                   </div>
                 )}
               </>
+            )}
+          </section>
+        </div>
+      )}
+
+      {profileView && (
+        <div className="modal-backdrop" onClick={() => setProfileView(null)}>
+          <section
+            className="extraction-dialog profile-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dialog-heading">
+              <div>
+                <p className="dialog-eyebrow">ANÁLISIS INTELIGENTE · HU-03 / HU-04</p>
+                <h2 id="profile-title">Perfil estructurado</h2>
+              </div>
+              <button type="button" className="dialog-close" onClick={() => setProfileView(null)} aria-label="Cerrar ventana">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <p className="dialog-filename" title={profileView.filename}>{profileView.filename}</p>
+
+            {profileView.loading && (
+              <div className="extraction-loading">
+                <span className="spinner extraction-spinner" aria-hidden="true" />
+                <span>Analizando el currículum con IA...</span>
+              </div>
+            )}
+
+            {profileView.error && (
+              <div className="error-message extraction-error" role="alert">
+                <span className="error-icon" aria-hidden="true">!</span>
+                {profileView.error}
+              </div>
+            )}
+
+            {profileView.data && (
+              <div className="profile-content">
+                <div className="profile-toolbar">
+                  <span className="profile-status"><span className="success-dot" /> Estructura validada</span>
+                  <button
+                    type="button"
+                    className={`view-toggle ${showRawProfile ? 'is-active' : ''}`}
+                    onClick={() => setShowRawProfile((visible) => !visible)}
+                    aria-pressed={showRawProfile}
+                  >
+                    {showRawProfile ? 'Ver perfil visual' : 'Inspeccionar JSON'}
+                  </button>
+                </div>
+
+                {showRawProfile ? (
+                  <pre className="profile-json">{JSON.stringify(profileView.data, null, 2)}</pre>
+                ) : (
+                  <div className="profile-sections">
+                    <section className="profile-section profile-identity">
+                      <div className="section-heading"><span className="section-kicker">IDENTIDAD</span><span className="section-rule" /></div>
+                      <div className="identity-grid">
+                        <div><span>Nombre</span><strong>{profileView.data.nombre_completo || 'No informado'}</strong></div>
+                        <div><span>Correo</span><strong>{profileView.data.correo || 'No informado'}</strong></div>
+                        <div><span>Teléfono</span><strong>{profileView.data.telefono || 'No informado'}</strong></div>
+                        <div><span>Ubicación</span><strong>{profileView.data.ubicacion || 'No informada'}</strong></div>
+                      </div>
+                      {profileView.data.resumen_profesional && <p className="profile-summary">{profileView.data.resumen_profesional}</p>}
+                    </section>
+
+                    <section className="profile-section">
+                      <div className="section-heading"><span className="section-kicker">HABILIDADES Y LENGUAS</span><span className="section-rule" /></div>
+                      <div className="tag-list">
+                        {[...(profileView.data.habilidades || []), ...(profileView.data.idiomas || []).map((idioma) => `Idioma: ${idioma}`)].length > 0
+                          ? [...(profileView.data.habilidades || []), ...(profileView.data.idiomas || []).map((idioma) => `Idioma: ${idioma}`)].map((item) => <span className="profile-tag" key={item}>{item}</span>)
+                          : <span className="profile-empty">No se registraron habilidades.</span>}
+                      </div>
+                    </section>
+
+                    <section className="profile-section">
+                      <div className="section-heading"><span className="section-kicker">EXPERIENCIA LABORAL</span><span className="section-rule" /></div>
+                      {(profileView.data.experiencia || []).length > 0 ? (
+                        <ol className="timeline-list">
+                          {profileView.data.experiencia.map((item, index) => (
+                            <li key={`${item.empresa || 'experiencia'}-${index}`}>
+                              <span className="timeline-index">{String(index + 1).padStart(2, '0')}</span>
+                              <div><strong>{item.cargo || 'Cargo no informado'}</strong><span className="timeline-company">{item.empresa || 'Empresa no informada'} · {item.fecha_inicio || '?'} - {item.fecha_fin || 'actualidad'}</span>{item.funciones?.length > 0 && <ul>{item.funciones.map((funcion) => <li key={funcion}>{funcion}</li>)}</ul>}</div>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : <p className="profile-empty">No se registró experiencia laboral.</p>}
+                    </section>
+
+                    <section className="profile-section">
+                      <div className="section-heading"><span className="section-kicker">EDUCACIÓN</span><span className="section-rule" /></div>
+                      {(profileView.data.educacion || []).length > 0 ? (
+                        <ol className="timeline-list education-list">
+                          {profileView.data.educacion.map((item, index) => <li key={`${item.institucion || 'educacion'}-${index}`}><span className="timeline-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{item.titulo || 'Título no informado'}</strong><span className="timeline-company">{item.institucion || 'Institución no informada'} · {item.anio_graduacion || 'Año no informado'}</span></div></li>)}
+                        </ol>
+                      ) : <p className="profile-empty">No se registró educación.</p>}
+                    </section>
+                  </div>
+                )}
+              </div>
             )}
           </section>
         </div>

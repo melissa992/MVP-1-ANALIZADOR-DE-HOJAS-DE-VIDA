@@ -23,7 +23,7 @@ class LLMExtractionService:
         system_prompt = (
             "Eres un experto extractor de datos de hojas de vida y analista de recursos humanos. "
             "Tu objetivo es analizar el texto plano de un CV heterogéneo y extraer la información clave "
-            "estrictamente basada en el documento (datos de contacto, resumen, experiencia, educación, habilidades e idiomas). "
+            "estrictamente basada en el documento (nombre, correo, teléfono, ubicación, resumen, experiencia, educación, habilidades e idiomas). "
             "Si un dato no está presente, asigna un valor null o una lista vacía. No inventes información."
         )
 

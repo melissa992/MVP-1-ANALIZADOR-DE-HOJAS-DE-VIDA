@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from typing import List
 import os
 import uuid
@@ -82,7 +82,8 @@ def analyze_and_normalize_cv(file_id: str):
     """
     try:
         # Extraer texto base del archivo PDF almacenado
-        raw_text = extract_text_from_pdf_service(file_id)
+        extraction_result = extract_text_from_pdf_service(file_id)
+        raw_text = extraction_result.get("extracted_text", "")
         
         if not raw_text or len(raw_text.strip()) == 0:
             raise HTTPException(
@@ -95,6 +96,8 @@ def analyze_and_normalize_cv(file_id: str):
 
         return structured_and_normalized_profile
 
+    except HTTPException:
+        raise
     except ValueError as ve:
         # Error específico de normalización o esquemas (HU-04)
         raise HTTPException(
