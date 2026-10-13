@@ -5,7 +5,9 @@ import uuid
 from app.services.extraction_service import extract_text_from_pdf_service
 from app.services.llm_extraction_service import LLMServiceUnavailable
 from app.services.normalization_service import normalization_service
+from app.services.vacancy_service import vacancy_service
 from app.models.cv_schema import CandidateProfileSchema
+from app.schemas.vacancy import VacancyCreate, VacancyResponse
 
 router = APIRouter()
 UPLOAD_DIR = "temp_storage"
@@ -112,4 +114,25 @@ def analyze_and_normalize_cv(file_id: str):
         raise HTTPException(
             status_code=500, 
             detail=f"Error interno en el procesamiento del CV: {str(e)}"
+        )
+
+
+@router.post(
+    "/vacancies/",
+    response_model=VacancyResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar una nueva vacante (HU-05)"
+)
+def create_vacancy(vacancy_data: VacancyCreate):
+    """
+    HU-05: Registra una nueva vacante en el sistema.
+    Recibe título y descripción, almacena la vacante con estado 'pending_processing'
+    y retorna la entidad creada.
+    """
+    try:
+        return vacancy_service.create_vacancy(vacancy_data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno al registrar la vacante: {str(e)}"
         )
