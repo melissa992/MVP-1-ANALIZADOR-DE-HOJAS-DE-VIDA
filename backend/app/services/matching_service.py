@@ -7,43 +7,53 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-from app.schemas.matching import MatchRequest, MatchResponse
+from app.schemas.matching import MatchBreakdown, MatchResponse
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-# System prompt del evaluador con ponderación estricta (HU-07)
-_EVALUATOR_SYSTEM_PROMPT = """Eres un motor de matching algorítmico y objetivo de Recursos Humanos.
-Tu tarea es evaluar la compatibilidad entre el perfil JSON de un candidato y los requisitos JSON de una vacante.
+_MISSING_EVIDENCE = "Sin evidencia en el CV."
+_CATEGORY_MAXIMA = {
+    "habilidades": 40,
+    "experiencia": 40,
+    "educacion": 10,
+    "idiomas": 10,
+}
 
-Aplica la siguiente ponderación estricta (Total 100%):
-- Años de Experiencia y Cargo: 40%  → máximo 40 puntos
-- Habilidades Técnicas Clave: 40%   → máximo 40 puntos
-- Nivel de Estudios e Idiomas: 20%  → máximo 20 puntos
+_EVALUATOR_SYSTEM_PROMPT = """Eres un evaluador objetivo de compatibilidad laboral.
+Evalúa únicamente requisitos de la vacante usando datos presentes en el perfil del candidato.
+No inventes experiencia, formación, habilidades, idiomas ni evidencias. No presentes una
+inferencia como un hecho. Para cada requisito, usa una sola de estas categorías:
+- "habilidades": habilidades_clave de la vacante.
+- "experiencia": cargo y años de experiencia requeridos.
+- "educacion": nivel_estudios requerido.
+- "idiomas": idiomas requeridos.
 
-REGLAS DE EVALUACIÓN:
-1. Experiencia/Cargo (0-40 pts): Compara el cargo objetivo del candidato con el cargo requerido, y los años de experiencia del candidato con los requeridos. Proporcional: si cumple exactamente, máximo 40 pts. Si supera, 40 pts. Si no alcanza, resta proporcionalmente.
-2. Habilidades Técnicas (0-40 pts): Cuenta cuántas habilidades_clave de la vacante aparecen en las habilidades del candidato (coincidencia exacta o semánticamente equivalente). Proporcional al porcentaje cubierto × 40.
-3. Estudios/Idiomas (0-20 pts): 10 pts por nivel de estudios (cumple o no), 10 pts por idiomas (proporcional a los cubiertos).
+Incluye cada requisito de la vacante exactamente una vez en una de estas listas:
+- requirements_met: evidencia suficiente y explícita.
+- requirements_partial: evidencia explícita que solo cubre parcialmente el requisito.
+- requirements_missing: no hay evidencia suficiente en el CV.
 
-El score total = suma de los tres subpuntajes. Redondea al entero más cercano.
+En "requirement" copia exactamente el texto del requisito de la vacante. Para años de
+experiencia usa el formato "<n> años de experiencia"; para el cargo usa "Cargo: <texto>".
+En "evidence", cita literalmente un fragmento breve del JSON del candidato para requisitos
+cumplidos o parciales. Si falta evidencia, escribe exactamente "Sin evidencia en el CV.".
+No uses la descripción de la vacante como evidencia del candidato.
 
-Responde ÚNICAMENTE en formato JSON con la siguiente estructura exacta (sin texto adicional, sin markdown):
+Escribe una justificación breve en español, de máximo cinco líneas. Cada afirmación sobre
+el candidato debe estar respaldada por datos del CV. No devuelvas puntajes: los calculará
+el sistema a partir del estado de los requisitos.
+
+Responde ÚNICAMENTE en formato JSON, sin texto adicional ni markdown, con esta estructura:
 {
-  "score": <int 0-100>,
-  "justification": "<string con análisis narrativo detallado en español, mencionando los tres ejes>",
-  "breakdown": {
-    "experiencia_cargo": <int 0-40>,
-    "habilidades_tecnicas": <int 0-40>,
-    "estudios_idiomas": <int 0-20>
-  }
+  "justification": "<máximo cinco líneas>",
+  "requirements_met": [{"category": "<categoría>", "requirement": "<texto exacto>", "evidence": "<cita del CV>"}],
+  "requirements_partial": [{"category": "<categoría>", "requirement": "<texto exacto>", "evidence": "<cita del CV>"}],
+  "requirements_missing": [{"category": "<categoría>", "requirement": "<texto exacto>", "evidence": "Sin evidencia en el CV."}]
 }"""
 
 
 class MatchingService:
-    """
-    HU-07: Servicio que calcula el score de idoneidad (fit score)
-    entre un candidato y una vacante usando Google Gemini con temperature=0.
-    """
+    """HU-07 / HU-08: calcula el score y presenta desglose y evidencia del matching."""
 
     def __init__(self) -> None:
         self._client: genai.Client | None = None
@@ -71,31 +81,18 @@ class MatchingService:
     def calculate_fit_score(
         self, candidate_data: dict, vacancy_data: dict
     ) -> MatchResponse:
-        """
-        HU-07: Evalúa la compatibilidad candidato-vacante y devuelve
-        un score numérico (0-100) con justificación y desglose por eje.
-
-        Args:
-            candidate_data: Perfil estructurado del candidato (HU-04).
-            vacancy_data: Requisitos estructurados de la vacante (HU-06).
-
-        Returns:
-            MatchResponse con score, justification y breakdown.
-
-        Raises:
-            RuntimeError: Si el LLM falla después de los reintentos configurados.
-            ValueError: Si los datos de entrada son inválidos o vacíos.
-        """
+        """Evalúa el ajuste y devuelve puntajes parciales, estados y evidencia."""
         if not candidate_data:
             raise ValueError("El perfil del candidato no puede estar vacío.")
         if not vacancy_data:
             raise ValueError("Los datos de la vacante no pueden estar vacíos.")
 
+        expected_requirements = self._expected_requirements(vacancy_data)
         user_message = (
             "Evalúa la compatibilidad entre el siguiente candidato y vacante:\n\n"
             f"=== PERFIL DEL CANDIDATO ===\n{json.dumps(candidate_data, ensure_ascii=False, indent=2)}\n\n"
             f"=== REQUISITOS DE LA VACANTE ===\n{json.dumps(vacancy_data, ensure_ascii=False, indent=2)}\n\n"
-            "Responde exclusivamente con el JSON de evaluación."
+            "Responde exclusivamente con el JSON indicado."
         )
 
         for attempt in range(self.max_attempts):
@@ -106,17 +103,14 @@ class MatchingService:
                     config=types.GenerateContentConfig(
                         system_instruction=_EVALUATOR_SYSTEM_PROMPT,
                         response_mime_type="application/json",
-                        temperature=0,  # Máxima consistencia / determinismo
+                        temperature=0,
                     ),
                 )
 
                 content = response.text
                 if not content or not content.strip():
-                    raise ValueError(
-                        "La respuesta del modelo Gemini está vacía."
-                    )
+                    raise ValueError("La respuesta del modelo Gemini está vacía.")
 
-                # Limpieza defensiva de bloques markdown que Gemini a veces añade
                 content_clean = content.strip()
                 if content_clean.startswith("```"):
                     content_clean = content_clean.strip("`")
@@ -125,41 +119,172 @@ class MatchingService:
 
                 parsed = json.loads(content_clean)
                 if not isinstance(parsed, dict):
-                    raise ValueError(
-                        "La respuesta del modelo no es un objeto JSON válido."
-                    )
+                    raise ValueError("La respuesta del modelo no es un objeto JSON válido.")
 
-                # Normalizar y validar score dentro del rango 0-100
-                raw_score = int(parsed.get("score", 0))
-                parsed["score"] = max(0, min(100, raw_score))
-
-                # Normalizar breakdown si existe
-                breakdown = parsed.get("breakdown", {})
-                if breakdown:
-                    breakdown["experiencia_cargo"] = max(
-                        0, min(40, int(breakdown.get("experiencia_cargo", 0)))
-                    )
-                    breakdown["habilidades_tecnicas"] = max(
-                        0, min(40, int(breakdown.get("habilidades_tecnicas", 0)))
-                    )
-                    breakdown["estudios_idiomas"] = max(
-                        0, min(20, int(breakdown.get("estudios_idiomas", 0)))
-                    )
-                    parsed["breakdown"] = breakdown
-
+                self._validate_requirement_evidence(
+                    parsed, expected_requirements, candidate_data
+                )
+                breakdown = self._calculate_breakdown(parsed)
+                parsed["breakdown"] = breakdown
+                parsed["score"] = sum(
+                    getattr(breakdown, category).score
+                    for category in _CATEGORY_MAXIMA
+                )
                 return MatchResponse(**parsed)
 
-            except Exception as e:
+            except Exception as error:
                 is_last = attempt == self.max_attempts - 1
-                if not self._is_transient_error(e) or is_last:
+                if not self._is_transient_error(error) or is_last:
                     raise RuntimeError(
-                        f"HU-07 Error al calcular el score de idoneidad con Gemini: {str(e)}"
-                    ) from e
+                        "HU-08 Error al generar un resultado verificable del matching: "
+                        f"{error}"
+                    ) from error
                 time.sleep(self.retry_delay_seconds * (2**attempt))
 
-        raise RuntimeError(
-            "HU-07 Error inesperado al calcular el score de idoneidad."
-        )
+        raise RuntimeError("HU-08 Error inesperado al calcular el score de idoneidad.")
+
+    @staticmethod
+    def _expected_requirements(vacancy_data: dict) -> set[tuple[str, str]]:
+        expected: set[tuple[str, str]] = set()
+
+        skills = vacancy_data.get("habilidades_clave", [])
+        if isinstance(skills, list):
+            expected.update(
+                ("habilidades", str(skill).strip())
+                for skill in skills
+                if skill is not None and str(skill).strip()
+            )
+
+        cargo = vacancy_data.get("cargo")
+        if isinstance(cargo, str) and cargo.strip():
+            expected.add(("experiencia", f"Cargo: {cargo.strip()}"))
+
+        years = vacancy_data.get("anios_experiencia_requeridos", 0)
+        try:
+            years = float(years)
+        except (TypeError, ValueError):
+            years = 0
+        if years > 0:
+            years_label = int(years) if years.is_integer() else years
+            expected.add(("experiencia", f"{years_label} años de experiencia"))
+
+        education = vacancy_data.get("nivel_estudios")
+        if (
+            isinstance(education, str)
+            and education.strip()
+            and education.strip().casefold() != "no especificado"
+        ):
+            expected.add(("educacion", education.strip()))
+
+        languages = vacancy_data.get("idiomas", [])
+        if isinstance(languages, list):
+            expected.update(
+                ("idiomas", str(language).strip())
+                for language in languages
+                if language is not None and str(language).strip()
+            )
+
+        return expected
+
+    @staticmethod
+    def _candidate_text_values(candidate_data: dict) -> list[str]:
+        values: list[str] = []
+
+        def collect(value) -> None:
+            if isinstance(value, dict):
+                for nested_value in value.values():
+                    collect(nested_value)
+            elif isinstance(value, list):
+                for nested_value in value:
+                    collect(nested_value)
+            elif isinstance(value, (str, int, float)) and not isinstance(value, bool):
+                text = str(value).strip()
+                if text:
+                    values.append(text)
+
+        collect(candidate_data)
+        return values
+
+    @classmethod
+    def _validate_requirement_evidence(
+        cls,
+        parsed: dict,
+        expected_requirements: set[tuple[str, str]],
+        candidate_data: dict,
+    ) -> None:
+        matched_requirements: set[tuple[str, str]] = set()
+        candidate_text = "\n".join(cls._candidate_text_values(candidate_data)).casefold()
+
+        for status in (
+            "requirements_met",
+            "requirements_partial",
+            "requirements_missing",
+        ):
+            items = parsed.get(status)
+            if not isinstance(items, list):
+                raise ValueError(f"{status} debe ser una lista.")
+
+            for item in items:
+                if not isinstance(item, dict):
+                    raise ValueError(f"Cada elemento de {status} debe ser un objeto.")
+                key = (item.get("category"), item.get("requirement"))
+                if key not in expected_requirements:
+                    raise ValueError(
+                        f"El modelo devolvió un requisito que no está en la vacante: {key}."
+                    )
+                if key in matched_requirements:
+                    raise ValueError(f"El requisito {key} aparece más de una vez.")
+                matched_requirements.add(key)
+
+                evidence = item.get("evidence")
+                if not isinstance(evidence, str) or not evidence.strip():
+                    raise ValueError(f"Falta evidencia para el requisito {key}.")
+                if status == "requirements_missing":
+                    if evidence.strip() != _MISSING_EVIDENCE:
+                        raise ValueError(
+                            f"Un requisito faltante debe usar la evidencia "
+                            f"'{_MISSING_EVIDENCE}'."
+                        )
+                elif evidence.strip().casefold() not in candidate_text:
+                    raise ValueError(
+                        f"La evidencia del requisito {key} no aparece literalmente "
+                        "en el perfil del candidato."
+                    )
+
+        if matched_requirements != expected_requirements:
+            missing = expected_requirements - matched_requirements
+            raise ValueError(f"El modelo omitió requisitos de la vacante: {sorted(missing)}.")
+
+    @staticmethod
+    def _calculate_breakdown(parsed: dict) -> MatchBreakdown:
+        entries_by_category = {
+            category: {"met": 0, "partial": 0}
+            for category in _CATEGORY_MAXIMA
+        }
+        totals_by_category = {category: 0 for category in _CATEGORY_MAXIMA}
+
+        for status, weight in (("requirements_met", 1), ("requirements_partial", 0.5)):
+            for item in parsed[status]:
+                category = item["category"]
+                entries_by_category[category][
+                    "met" if weight == 1 else "partial"
+                ] += 1
+                totals_by_category[category] += 1
+
+        for item in parsed["requirements_missing"]:
+            totals_by_category[item["category"]] += 1
+
+        category_scores = {}
+        for category, maximum in _CATEGORY_MAXIMA.items():
+            total = totals_by_category[category]
+            earned = (
+                entries_by_category[category]["met"]
+                + 0.5 * entries_by_category[category]["partial"]
+            )
+            score = maximum if total == 0 else int(maximum * earned / total + 0.5)
+            category_scores[category] = {"score": score, "max_score": maximum}
+
+        return MatchBreakdown(**category_scores)
 
     @staticmethod
     def _is_transient_error(error: Exception) -> bool:
@@ -175,5 +300,4 @@ class MatchingService:
         )
 
 
-# Singleton del servicio de matching
 matching_service = MatchingService()
