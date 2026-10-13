@@ -6,8 +6,8 @@ Plataforma modular para la ingesta y extracción de texto de hojas de vida en PD
 
 - **Brayan Jurado:** Ingesta (HU-01) y extracción de texto (HU-02).
 - **Nicolás Granada:** Procesamiento con LLM y normalización (HU-03 / HU-04).
-- **Camilo:** Gestión de vacantes y parametrización (HU-05 / HU-06).
-- **Melissa:** Motor de matching, scoring y dashboard (HU-07 a HU-10).
+- **Camilo López:** Gestión de vacantes y parametrización (HU-05 / HU-06).
+- **Melissa Ocoro:** Motor de matching, scoring y dashboard (HU-07 a HU-10).
 
 ## Requisitos previos
 
