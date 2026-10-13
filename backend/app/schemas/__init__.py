@@ -3,5 +3,12 @@ from app.schemas.vacancy import (
     VacancyRequirements,
     VacancyResponse,
 )
+from app.schemas.matching import MatchRequest, MatchResponse
 
-__all__ = ["VacancyCreate", "VacancyRequirements", "VacancyResponse"]
+__all__ = [
+    "VacancyCreate",
+    "VacancyRequirements",
+    "VacancyResponse",
+    "MatchRequest",
+    "MatchResponse",
+]

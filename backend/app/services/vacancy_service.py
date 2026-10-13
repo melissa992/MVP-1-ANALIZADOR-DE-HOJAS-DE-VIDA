@@ -35,7 +35,7 @@ class VacancyService:
         self._load_existing_vacancies()
 
         self._client: Optional[genai.Client] = None
-        self.model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        self.model = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
         self.max_attempts = int(os.getenv("GEMINI_MAX_ATTEMPTS", "3"))
         self.retry_delay_seconds = float(os.getenv("GEMINI_RETRY_DELAY_SECONDS", "2"))
 

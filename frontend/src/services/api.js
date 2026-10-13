@@ -43,6 +43,49 @@ export async function createVacancy(title, rawDescription) {
   return data;
 }
 
+/**
+ * Calcula el score de idoneidad entre un candidato y una vacante (HU-07).
+ * Llama al Matching Engine del backend que usa Gemini con temperature=0.
+ *
+ * @param {Object} candidateData - Perfil estructurado del candidato (salida de HU-04).
+ * @param {Object} vacancyData   - Requisitos estructurados de la vacante (salida de HU-06).
+ * @returns {Promise<{score: number, justification: string, breakdown: Object}>}
+ */
+export async function calculateMatch(candidateData, vacancyData) {
+  if (!candidateData || typeof candidateData !== 'object') {
+    throw new Error('El perfil del candidato es obligatorio y debe ser un objeto JSON.');
+  }
+  if (!vacancyData || typeof vacancyData !== 'object') {
+    throw new Error('Los datos de la vacante son obligatorios y deben ser un objeto JSON.');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/match/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      candidate_data: candidateData,
+      vacancy_data: vacancyData,
+    }),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const errorDetail =
+      (typeof data?.detail === 'string' && data.detail) ||
+      (Array.isArray(data?.detail) && data.detail.map((d) => d.msg || d).join(', ')) ||
+      `Error ${response.status}: No fue posible calcular el score de idoneidad.`;
+
+    throw new Error(errorDetail);
+  }
+
+  return data;
+}
+
 export default {
   createVacancy,
+  calculateMatch,
 };
