@@ -12,6 +12,7 @@ from app.models.cv_schema import CandidateProfileSchema
 from app.schemas.vacancy import VacancyCreate, VacancyResponse
 from app.schemas.matching import MatchRequest, MatchResponse
 from app.schemas.ranking import VacancyRankingResponse
+from app.schemas.candidate import CandidateDetailResponse
 from app.services.ranking_service import ranking_service
 
 router = APIRouter()
@@ -211,6 +212,34 @@ def get_vacancy_ranking(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"No fue posible leer los datos del ranking: {error}",
         ) from error
+
+
+@router.get(
+    "/candidates/{candidate_id}/detail",
+    response_model=CandidateDetailResponse,
+    summary="Consultar el perfil completo y análisis de un candidato (HU-10)",
+)
+def get_candidate_detail(candidate_id: str, vacancy_id: str = Query(...)):
+    vacancy = vacancy_service.get_vacancy(vacancy_id)
+    if vacancy is None:
+        raise HTTPException(status_code=404, detail="No se encontró la vacante.")
+    try:
+        detail = ranking_service.get_candidate_detail(
+            candidate_id=candidate_id,
+            vacancy_id=vacancy_id,
+            vacancy=vacancy,
+        )
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No fue posible leer el detalle del candidato: {error}",
+        ) from error
+    if detail is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No se encontró el detalle del candidato para esta vacante.",
+        )
+    return detail
 
 
 @router.post(

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getVacancyRanking, listVacancies } from '../../services/api';
+import CandidateDetailModal from '../candidate/CandidateDetailModal';
 import './RankingDashboard.css';
 
 const SORT_COLUMNS = [
@@ -246,36 +247,11 @@ export default function RankingDashboard() {
       )}
 
       {selectedCandidate && (
-        <div className="ranking-modal-backdrop" onClick={() => setSelectedCandidate(null)}>
-          <section
-            className="ranking-detail-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="ranking-detail-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="ranking-detail-close"
-              onClick={() => setSelectedCandidate(null)}
-              aria-label="Cerrar detalle"
-            >
-              ×
-            </button>
-            <p className="ranking-eyebrow">DETALLE DEL CANDIDATO</p>
-            <h2 id="ranking-detail-title">{selectedCandidate.candidate_name}</h2>
-            <MatchBadge level={selectedCandidate.match_level} score={selectedCandidate.score} />
-            <p>{selectedCandidate.experience_years} años de experiencia</p>
-            <h3>Habilidades coincidentes</h3>
-            <div className="ranking-skill-pills">
-              {selectedCandidate.matching_skills.length
-                ? selectedCandidate.matching_skills.map((candidateSkill) => (
-                  <span className="ranking-skill-pill" key={candidateSkill}>{candidateSkill}</span>
-                ))
-                : <span className="ranking-no-skills">Sin habilidades coincidentes</span>}
-            </div>
-          </section>
-        </div>
+        <CandidateDetailModal
+          candidateId={selectedCandidate.candidate_id}
+          vacancyId={vacancyId}
+          onClose={() => setSelectedCandidate(null)}
+        />
       )}
     </section>
   );

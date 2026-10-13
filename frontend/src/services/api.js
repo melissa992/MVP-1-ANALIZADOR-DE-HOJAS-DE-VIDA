@@ -130,9 +130,32 @@ export async function getVacancyRanking(vacancyId, filters = {}) {
   return data;
 }
 
+export async function getCandidateDetail(candidateId, vacancyId) {
+  if (!candidateId || !vacancyId) {
+    throw new Error('Se requiere el candidato y la vacante para consultar el detalle.');
+  }
+
+  const query = new URLSearchParams({ vacancy_id: vacancyId });
+  const response = await fetch(
+    `${API_BASE_URL}/candidates/${encodeURIComponent(candidateId)}/detail?${query}`,
+    { headers: { Accept: 'application/json' } },
+  );
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: No fue posible cargar el detalle del candidato.`,
+    );
+  }
+
+  return data;
+}
+
 export default {
   createVacancy,
   calculateMatch,
   listVacancies,
   getVacancyRanking,
+  getCandidateDetail,
 };
