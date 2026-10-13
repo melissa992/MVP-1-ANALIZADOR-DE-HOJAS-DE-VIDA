@@ -31,6 +31,17 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
+El análisis de hojas de vida utiliza Gemini. Antes de iniciar el backend, configura tu
+clave de API en el entorno:
+
+```powershell
+$env:GEMINI_API_KEY = "tu-clave-de-gemini"
+$env:GEMINI_MODEL = "gemini-3-flash-preview" # opcional
+```
+
+También puedes copiar [.env.example](.env.example) como referencia. No agregues la
+clave real al repositorio.
+
 En Windows, si usas el Símbolo del sistema en lugar de PowerShell, activa el entorno con:
 
 ```bat
@@ -97,4 +108,3 @@ cv-match-ai/
 │   └── BITACORA_MVP.md
 ├── .gitignore            # Archivos a ignorar por Git
 └── README.md             # Descripción general del proyecto
-
