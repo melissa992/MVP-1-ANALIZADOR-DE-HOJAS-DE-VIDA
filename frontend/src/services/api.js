@@ -51,7 +51,7 @@ export async function createVacancy(title, rawDescription) {
  * @param {Object} vacancyData   - Requisitos estructurados de la vacante (salida de HU-06).
  * @returns {Promise<{score: number, justification: string, breakdown: Object, requirements_met: Array, requirements_partial: Array, requirements_missing: Array}>}
  */
-export async function calculateMatch(candidateData, vacancyData) {
+export async function calculateMatch(candidateData, vacancyData, vacancyId) {
   if (!candidateData || typeof candidateData !== 'object') {
     throw new Error('El perfil del candidato es obligatorio y debe ser un objeto JSON.');
   }
@@ -68,6 +68,7 @@ export async function calculateMatch(candidateData, vacancyData) {
     body: JSON.stringify({
       candidate_data: candidateData,
       vacancy_data: vacancyData,
+      ...(vacancyId ? { vacancy_id: vacancyId } : {}),
     }),
   });
 
@@ -85,7 +86,53 @@ export async function calculateMatch(candidateData, vacancyData) {
   return data;
 }
 
+export async function listVacancies() {
+  const response = await fetch(`${API_BASE_URL}/vacancies/`, {
+    headers: { Accept: 'application/json' },
+  });
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: No fue posible cargar las vacantes.`,
+    );
+  }
+
+  return data;
+}
+
+export async function getVacancyRanking(vacancyId, filters = {}) {
+  if (!vacancyId) {
+    throw new Error('Debes seleccionar una vacante para consultar el ranking.');
+  }
+
+  const query = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, String(value));
+    }
+  });
+  const suffix = query.size ? `?${query.toString()}` : '';
+  const response = await fetch(
+    `${API_BASE_URL}/ranking/${encodeURIComponent(vacancyId)}${suffix}`,
+    { headers: { Accept: 'application/json' } },
+  );
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: No fue posible cargar el ranking.`,
+    );
+  }
+
+  return data;
+}
+
 export default {
   createVacancy,
   calculateMatch,
+  listVacancies,
+  getVacancyRanking,
 };

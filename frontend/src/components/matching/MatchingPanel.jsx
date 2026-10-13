@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { calculateMatch } from '../../services/api';
+import { useState, useRef, useEffect } from 'react';
+import { calculateMatch, listVacancies } from '../../services/api';
 import './MatchingPanel.css';
 
 /* ─────────────────────────────────────────────────
@@ -154,7 +154,24 @@ export default function MatchingPanel() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [apiError, setApiError] = useState('');
+  const [vacancies, setVacancies] = useState([]);
+  const [selectedVacancyId, setSelectedVacancyId] = useState('');
+  const [vacanciesError, setVacanciesError] = useState('');
   const resultRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    listVacancies()
+      .then((data) => {
+        if (active) setVacancies(data.filter((vacancy) => vacancy.structured_requirements));
+      })
+      .catch((error) => {
+        if (active) setVacanciesError(error.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const validate = () => {
     let valid = true;
@@ -195,7 +212,11 @@ export default function MatchingPanel() {
     setApiError('');
 
     try {
-      const data = await calculateMatch(parsed.candidate, parsed.vacancy);
+      const data = await calculateMatch(
+        parsed.candidate,
+        parsed.vacancy,
+        selectedVacancyId || undefined,
+      );
       setResult(data);
       // Scroll suave al resultado
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
@@ -213,6 +234,7 @@ export default function MatchingPanel() {
     setVacancyErr('');
     setResult(null);
     setApiError('');
+    setSelectedVacancyId('');
   };
 
   const colors = result ? scoreColor(result.score) : null;
@@ -236,9 +258,39 @@ export default function MatchingPanel() {
             label="Requisitos de la Vacante (JSON)"
             hint="Pega los requisitos estructurados de la vacante (structured_requirements de HU-06)."
             value={vacancyRaw}
-            onChange={setVacancyRaw}
+            onChange={(value) => {
+              setVacancyRaw(value);
+              setSelectedVacancyId('');
+            }}
             error={vacancyErr}
           />
+        </div>
+        <div className="json-field matching-vacancy-link">
+          <label htmlFor="matching-vacancy" className="json-label">
+            Asociar resultado al ranking (opcional)
+          </label>
+          <p className="json-hint">
+            Selecciona una vacante procesada para guardar el resultado en su dashboard HU-09.
+          </p>
+          <select
+            id="matching-vacancy"
+            className="json-textarea"
+            value={selectedVacancyId}
+            onChange={(event) => {
+              const vacancy = vacancies.find((item) => String(item.id) === event.target.value);
+              setSelectedVacancyId(event.target.value);
+              if (vacancy?.structured_requirements) {
+                setVacancyRaw(JSON.stringify(vacancy.structured_requirements, null, 2));
+                setVacancyErr('');
+              }
+            }}
+          >
+            <option value="">Sin asociar (solo calcular)</option>
+            {vacancies.map((vacancy) => (
+              <option key={vacancy.id} value={vacancy.id}>{vacancy.title}</option>
+            ))}
+          </select>
+          {vacanciesError && <p className="json-error" role="alert">{vacanciesError}</p>}
         </div>
 
         {/* Error de API */}

@@ -1,5 +1,6 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from typing import List
+import json
 import os
 import uuid
 from app.services.extraction_service import extract_text_from_pdf_service
@@ -10,6 +11,8 @@ from app.services.matching_service import matching_service
 from app.models.cv_schema import CandidateProfileSchema
 from app.schemas.vacancy import VacancyCreate, VacancyResponse
 from app.schemas.matching import MatchRequest, MatchResponse
+from app.schemas.ranking import VacancyRankingResponse
+from app.services.ranking_service import ranking_service
 
 router = APIRouter()
 UPLOAD_DIR = "temp_storage"
@@ -167,6 +170,49 @@ def create_vacancy(vacancy_data: VacancyCreate):
         )
 
 
+@router.get("/vacancies/", response_model=List[VacancyResponse])
+def list_vacancies():
+    """HU-09: entrega las vacantes disponibles para los selectores del frontend."""
+    return vacancy_service.list_vacancies()
+
+
+@router.get("/ranking/{vacancy_id}", response_model=VacancyRankingResponse)
+def get_vacancy_ranking(
+    vacancy_id: str,
+    min_score: int = Query(default=0, ge=0, le=100),
+    max_score: int = Query(default=100, ge=0, le=100),
+    skill: str | None = Query(default=None),
+    sort_by: str = Query(
+        default="score",
+        pattern="^(candidate_name|score|experience_years)$",
+    ),
+    order: str = Query(default="desc", pattern="^(asc|desc)$"),
+):
+    vacancy = vacancy_service.get_vacancy(vacancy_id)
+    if vacancy is None:
+        raise HTTPException(status_code=404, detail="No se encontró la vacante.")
+    if min_score > max_score:
+        raise HTTPException(
+            status_code=422,
+            detail="min_score no puede ser mayor que max_score.",
+        )
+    try:
+        return ranking_service.get_vacancy_ranking(
+            vacancy_id=vacancy_id,
+            min_score=min_score,
+            max_score=max_score,
+            skill=skill,
+            sort_by=sort_by,
+            order=order,
+            vacancy=vacancy,
+        )
+    except (OSError, ValueError, KeyError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No fue posible leer los datos del ranking: {error}",
+        ) from error
+
+
 @router.post(
     "/match/",
     response_model=MatchResponse,
@@ -180,17 +226,43 @@ def calculate_match(match_request: MatchRequest):
     un score de idoneidad (0-100), desglose por categoría, evidencia
     de requisitos cumplidos/parciales/faltantes y justificación breve.
 
-    Ponderación:
-    - Habilidades: 40 puntos
-    - Experiencia y cargo: 40 puntos
-    - Educación: 10 puntos
-    - Idiomas: 10 puntos
+    Si se proporciona vacancy_id, también persiste el resultado para HU-09.
     """
+    vacancy = None
+    if match_request.vacancy_id:
+        vacancy = vacancy_service.get_vacancy(match_request.vacancy_id)
+        if vacancy is None:
+            raise HTTPException(status_code=404, detail="No se encontró la vacante.")
+        if vacancy.structured_requirements is None:
+            raise HTTPException(
+                status_code=409,
+                detail="La vacante aún no tiene requisitos estructurados.",
+            )
+        submitted_requirements = json.dumps(
+            match_request.vacancy_data, ensure_ascii=False, sort_keys=True
+        )
+        saved_requirements = json.dumps(
+            vacancy.structured_requirements.model_dump(),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        if submitted_requirements != saved_requirements:
+            raise HTTPException(
+                status_code=422,
+                detail="Los requisitos enviados no corresponden a la vacante seleccionada.",
+            )
+
     try:
         result = matching_service.calculate_fit_score(
             candidate_data=match_request.candidate_data,
             vacancy_data=match_request.vacancy_data,
         )
+        if vacancy is not None:
+            ranking_service.save_match_result(
+                vacancy=vacancy,
+                candidate_data=match_request.candidate_data,
+                match_result=result,
+            )
         return result
     except ValueError as ve:
         raise HTTPException(
@@ -202,6 +274,11 @@ def calculate_match(match_request: MatchRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(re),
         ) from re
+    except OSError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No fue posible guardar el resultado del ranking: {error}",
+        ) from error
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
