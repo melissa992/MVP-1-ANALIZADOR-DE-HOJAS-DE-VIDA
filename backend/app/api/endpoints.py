@@ -121,18 +121,45 @@ def analyze_and_normalize_cv(file_id: str):
     "/vacancies/",
     response_model=VacancyResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Registrar una nueva vacante (HU-05)"
+    summary="Registrar una nueva vacante y estructurar requisitos con LLM (HU-05 / HU-06)"
 )
 def create_vacancy(vacancy_data: VacancyCreate):
     """
-    HU-05: Registra una nueva vacante en el sistema.
-    Recibe título y descripción, almacena la vacante con estado 'pending_processing'
-    y retorna la entidad creada.
+    1. HU-05: Guarda la vacante con estado 'pending_processing'.
+    2. HU-06: Llama al LLM para extraer y estructurar los requisitos de la vacante.
+    3. Actualiza la vacante guardada con el JSON resultante y cambia su estado a 'processed'.
+    4. Retorna la vacante completa con sus requisitos estructurados.
     """
+    # 1. Guardar vacante inicial en estado 'pending_processing'
     try:
-        return vacancy_service.create_vacancy(vacancy_data)
+        saved_vacancy = vacancy_service.create_vacancy(vacancy_data)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error interno al registrar la vacante: {str(e)}"
+            detail=f"Error interno al guardar la vacante: {str(e)}"
+        )
+
+    # 2. Procesar y estructurar requisitos con LLM
+    try:
+        structured_requirements = vacancy_service.process_vacancy_requirements(
+            saved_vacancy.raw_description
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al estructurar los requisitos de la vacante con LLM: {str(e)}"
+        )
+
+    # 3. Actualizar la vacante guardada a estado 'processed'
+    try:
+        updated_vacancy = vacancy_service.update_vacancy(
+            vacancy_id=saved_vacancy.id,
+            structured_requirements=structured_requirements,
+            status="processed"
+        )
+        return updated_vacancy
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al actualizar la vacante procesada: {str(e)}"
         )
