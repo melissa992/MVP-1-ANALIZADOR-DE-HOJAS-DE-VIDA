@@ -1,3 +1,7 @@
-from app.schemas.vacancy import VacancyCreate, VacancyResponse
+from app.schemas.vacancy import (
+    VacancyCreate,
+    VacancyRequirements,
+    VacancyResponse,
+)
 
-__all__ = ["VacancyCreate", "VacancyResponse"]
+__all__ = ["VacancyCreate", "VacancyRequirements", "VacancyResponse"]

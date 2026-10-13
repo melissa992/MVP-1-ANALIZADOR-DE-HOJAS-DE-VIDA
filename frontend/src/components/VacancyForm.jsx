@@ -89,32 +89,61 @@ export default function VacancyForm({ onSuccess }) {
         {/* Mensaje de éxito tras registro */}
         {createdVacancy && (
           <div
-            className="mx-6 sm:mx-8 mt-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+            className="mx-6 sm:mx-8 mt-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-950 flex flex-col gap-3 shadow-xs"
             role="status"
             aria-live="polite"
           >
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M5 13l4 4L19 7" />
-                </svg>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-semibold text-emerald-900 text-sm">
+                    ¡Vacante registrada y estructurada con IA exitosamente!
+                  </p>
+                  <p className="text-xs text-emerald-800/90 mt-0.5">
+                    <strong className="font-medium text-emerald-950">"{createdVacancy.title}"</strong> · Estado: <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-200/80 text-emerald-900">{createdVacancy.status}</span> · ID: <code className="px-1.5 py-0.5 bg-emerald-100/70 rounded text-[11px] font-mono text-emerald-900">{createdVacancy.id}</code>
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-emerald-900 text-sm">
-                  ¡Vacante registrada exitosamente!
-                </p>
-                <p className="text-xs text-emerald-800/90 mt-0.5">
-                  <strong className="font-medium text-emerald-950">"{createdVacancy.title}"</strong> fue guardada con ID: <code className="px-1.5 py-0.5 bg-emerald-100/70 rounded text-[11px] font-mono text-emerald-900">{createdVacancy.id}</code>
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={handleDismissAlerts}
+                className="text-xs text-emerald-700 hover:text-emerald-950 underline font-medium self-end sm:self-center cursor-pointer transition-colors"
+              >
+                Cerrar aviso
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleDismissAlerts}
-              className="text-xs text-emerald-700 hover:text-emerald-950 underline font-medium self-end sm:self-center cursor-pointer transition-colors"
-            >
-              Cerrar aviso
-            </button>
+
+            {/* HU-06: Vista previa de requisitos estructurados por LLM */}
+            {createdVacancy.structured_requirements && (
+              <div className="mt-2 pt-3 border-t border-emerald-200/70 text-xs text-slate-800 bg-white/70 rounded-lg p-3">
+                <div className="font-bold text-emerald-950 mb-2 flex items-center gap-1.5">
+                  <span>✨ Requisitos estructurados con LLM (HU-06):</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[12px]">
+                  <div><span className="font-semibold text-slate-600">Cargo normalizado:</span> {createdVacancy.structured_requirements.cargo || 'No especificado'}</div>
+                  <div><span className="font-semibold text-slate-600">Experiencia mínima:</span> {createdVacancy.structured_requirements.anios_experiencia_requeridos} año(s)</div>
+                  <div><span className="font-semibold text-slate-600">Nivel de estudios:</span> {createdVacancy.structured_requirements.nivel_estudios || 'No especificado'}</div>
+                  <div><span className="font-semibold text-slate-600">Idiomas:</span> {createdVacancy.structured_requirements.idiomas?.length ? createdVacancy.structured_requirements.idiomas.join(', ') : 'No especificado'}</div>
+                </div>
+                {createdVacancy.structured_requirements.habilidades_clave?.length > 0 && (
+                  <div className="mt-2.5">
+                    <span className="font-semibold text-slate-600 block mb-1">Habilidades clave extraídas:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {createdVacancy.structured_requirements.habilidades_clave.map((hab, idx) => (
+                        <span key={idx} className="px-2 py-0.5 rounded bg-emerald-100 text-[#274b40] font-medium text-[11px]">
+                          {hab}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
