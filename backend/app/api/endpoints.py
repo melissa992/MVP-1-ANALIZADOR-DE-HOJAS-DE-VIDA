@@ -171,19 +171,20 @@ def create_vacancy(vacancy_data: VacancyCreate):
     "/match/",
     response_model=MatchResponse,
     status_code=status.HTTP_200_OK,
-    summary="Calcular score de idoneidad candidato-vacante (HU-07)",
+    summary="Calcular score y justificar requisitos candidato-vacante (HU-07 / HU-08)",
 )
 def calculate_match(match_request: MatchRequest):
     """
-    HU-07: Recibe el perfil estructurado de un candidato (HU-04) y
+    HU-07 / HU-08: Recibe el perfil estructurado de un candidato (HU-04) y
     los requisitos estructurados de una vacante (HU-06), y retorna
-    un score numérico de idoneidad (0-100) junto con su justificación
-    y desglose por eje de ponderación.
+    un score de idoneidad (0-100), desglose por categoría, evidencia
+    de requisitos cumplidos/parciales/faltantes y justificación breve.
 
     Ponderación:
-    - Años de Experiencia y Cargo: 40%
-    - Habilidades Técnicas Clave:  40%
-    - Nivel de Estudios e Idiomas: 20%
+    - Habilidades: 40 puntos
+    - Experiencia y cargo: 40 puntos
+    - Educación: 10 puntos
+    - Idiomas: 10 puntos
     """
     try:
         result = matching_service.calculate_fit_score(

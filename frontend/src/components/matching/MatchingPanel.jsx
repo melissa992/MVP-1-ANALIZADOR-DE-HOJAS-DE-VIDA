@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { calculateMatch } from '../../services/api';
+import './MatchingPanel.css';
 
 /* ─────────────────────────────────────────────────
    Helpers
@@ -81,6 +82,40 @@ function BreakdownBar({ label, value, max, color }) {
         />
       </div>
     </div>
+  );
+}
+
+const REQUIREMENT_CATEGORIES = {
+  habilidades: 'Habilidad',
+  experiencia: 'Experiencia',
+  educacion: 'Educación',
+  idiomas: 'Idioma',
+};
+
+function RequirementList({ title, items, status }) {
+  return (
+    <section className={`requirement-group requirement-group-${status}`}>
+      <h4 className="requirement-group-title">
+        {title} <span>{items.length}</span>
+      </h4>
+      {items.length ? (
+        <ul className="requirement-list">
+          {items.map((item) => (
+            <li key={`${item.category}-${item.requirement}`}>
+              <strong>
+                <span className="requirement-category">
+                  {REQUIREMENT_CATEGORIES[item.category] || item.category}
+                </span>
+                {item.requirement}
+              </strong>
+              <span className="requirement-evidence">{item.evidence}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="requirement-empty">No hay requisitos en esta categoría.</p>
+      )}
+    </section>
   );
 }
 
@@ -261,7 +296,7 @@ export default function MatchingPanel() {
 
           <div className="match-result-header">
             <div>
-              <p className="match-result-eyebrow">MATCHING ENGINE · HU-07</p>
+              <p className="match-result-eyebrow">MATCHING ENGINE · HU-07 / HU-08</p>
               <h3 className="match-result-title">Resultado de Idoneidad</h3>
             </div>
             <span className="match-result-badge" style={{ background: colors.bg, color: colors.text, borderColor: colors.ring + '60' }}>
@@ -280,26 +315,53 @@ export default function MatchingPanel() {
               </p>
             </div>
 
-            {/* Desglose por eje */}
+            {/* Desglose por categoría */}
             <div className="match-breakdown-col">
-              <p className="match-breakdown-title">Desglose por eje de ponderación</p>
+              <p className="match-breakdown-title">Desglose por categoría</p>
               <BreakdownBar
-                label="Experiencia y Cargo (40%)"
-                value={result.breakdown?.experiencia_cargo ?? 0}
-                max={40}
-                color="#3b82f6"
-              />
-              <BreakdownBar
-                label="Habilidades Técnicas (40%)"
-                value={result.breakdown?.habilidades_tecnicas ?? 0}
+                label="Habilidades"
+                value={result.breakdown?.habilidades?.score ?? 0}
                 max={40}
                 color="#8b5cf6"
               />
               <BreakdownBar
-                label="Estudios e Idiomas (20%)"
-                value={result.breakdown?.estudios_idiomas ?? 0}
-                max={20}
+                label="Experiencia"
+                value={result.breakdown?.experiencia?.score ?? 0}
+                max={40}
+                color="#3b82f6"
+              />
+              <BreakdownBar
+                label="Educación"
+                value={result.breakdown?.educacion?.score ?? 0}
+                max={10}
                 color="#0ea5e9"
+              />
+              <BreakdownBar
+                label="Idiomas"
+                value={result.breakdown?.idiomas?.score ?? 0}
+                max={10}
+                color="#0ea5e9"
+              />
+            </div>
+          </div>
+
+          <div className="match-requirements">
+            <p className="match-breakdown-title">Requisitos y evidencia del CV</p>
+            <div className="requirements-grid">
+              <RequirementList
+                title="Cumplidos"
+                items={result.requirements_met || []}
+                status="met"
+              />
+              <RequirementList
+                title="Parcialmente cumplidos"
+                items={result.requirements_partial || []}
+                status="partial"
+              />
+              <RequirementList
+                title="Faltantes"
+                items={result.requirements_missing || []}
+                status="missing"
               />
             </div>
           </div>

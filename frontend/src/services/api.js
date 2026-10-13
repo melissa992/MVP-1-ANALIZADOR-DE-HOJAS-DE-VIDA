@@ -44,12 +44,12 @@ export async function createVacancy(title, rawDescription) {
 }
 
 /**
- * Calcula el score de idoneidad entre un candidato y una vacante (HU-07).
+ * Calcula el score y devuelve desglose y evidencia de requisitos (HU-07 / HU-08).
  * Llama al Matching Engine del backend que usa Gemini con temperature=0.
  *
  * @param {Object} candidateData - Perfil estructurado del candidato (salida de HU-04).
  * @param {Object} vacancyData   - Requisitos estructurados de la vacante (salida de HU-06).
- * @returns {Promise<{score: number, justification: string, breakdown: Object}>}
+ * @returns {Promise<{score: number, justification: string, breakdown: Object, requirements_met: Array, requirements_partial: Array, requirements_missing: Array}>}
  */
 export async function calculateMatch(candidateData, vacancyData) {
   if (!candidateData || typeof candidateData !== 'object') {
