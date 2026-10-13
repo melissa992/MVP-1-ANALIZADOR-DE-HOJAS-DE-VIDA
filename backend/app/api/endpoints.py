@@ -3,6 +3,7 @@ from typing import List
 import os
 import uuid
 from app.services.extraction_service import extract_text_from_pdf_service
+from app.services.llm_extraction_service import LLMServiceUnavailable
 from app.services.normalization_service import normalization_service
 from app.models.cv_schema import CandidateProfileSchema
 
@@ -98,6 +99,8 @@ def analyze_and_normalize_cv(file_id: str):
 
     except HTTPException:
         raise
+    except LLMServiceUnavailable as lue:
+        raise HTTPException(status_code=503, detail=str(lue)) from lue
     except ValueError as ve:
         # Error específico de normalización o esquemas (HU-04)
         raise HTTPException(

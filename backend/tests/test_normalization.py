@@ -69,6 +69,39 @@ def test_normalization_rejects_experience_as_string(monkeypatch):
     assert fake_llm.calls == 3
 
 
+def test_normalization_maps_gemini_aliases(monkeypatch):
+    monkeypatch.setattr(
+        normalization_module,
+        "llm_extraction_service",
+        FakeLLM(
+            {
+                "ubicacion": {
+                    "direccion": "Calle 10",
+                    "municipio": "Popayán",
+                    "departamento": "Cauca",
+                },
+                "experiencia": [
+                    {
+                        "cargo": "Analista",
+                        "empresa": "Acme",
+                        "periodo": "08/2021 - 08/2022",
+                        "tareas": "Brindar soporte técnico.",
+                        "ubicacion": "Jamundí",
+                    }
+                ],
+            }
+        ),
+    )
+
+    profile = normalization_module.NormalizationService().process_and_normalize("CV")
+
+    assert profile.ubicacion == "Calle 10, Popayán, Cauca"
+    assert profile.experiencia[0].fecha_inicio == "08/2021"
+    assert profile.experiencia[0].fecha_fin == "08/2022"
+    assert profile.experiencia[0].funciones == ["Brindar soporte técnico."]
+    assert profile.experiencia[0].ubicacion == "Jamundí"
+
+
 def test_schema_rejects_unknown_fields():
     with pytest.raises(ValidationError):
         CandidateProfileSchema(campo_inventado="no permitido")

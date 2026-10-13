@@ -11,6 +11,7 @@ class ExperienceItem(BaseModel):
     fecha_inicio: Optional[str] = Field(None, description="Formato ISO 8601 (YYYY-MM)")
     fecha_fin: Optional[str] = Field(None, description="Formato ISO 8601 (YYYY-MM) o 'actualidad'")
     funciones: List[str] = Field(default_factory=list)
+    ubicacion: Optional[str] = None
 
 
 class EducationItem(BaseModel):
