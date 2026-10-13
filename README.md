@@ -81,19 +81,6 @@ Para probar la extracción desde Swagger:
 
 La interfaz web ofrece el mismo flujo: carga un PDF y selecciona **Ver texto extraído** en el resultado del archivo.
 
-### HU-08: desglose y justificación del score
-
-El endpoint `POST /match/` devuelve un score calculado a partir de cuatro categorías:
-habilidades (40 puntos), experiencia y cargo (40), educación (10) e idiomas (10).
-El campo `breakdown` muestra el puntaje obtenido y el máximo para cada categoría.
-
-La respuesta también separa `requirements_met`, `requirements_partial` y
-`requirements_missing`. Cada elemento indica la categoría, el requisito y evidencia
-citada del perfil del candidato; si no hay evidencia, se indica **Sin evidencia en el CV.**
-La justificación narrativa está limitada a cinco líneas. El backend verifica que todos
-los requisitos estructurados de la vacante estén clasificados y que las citas de los
-requisitos cumplidos o parciales aparezcan en los datos del candidato.
-
 ## Comandos útiles del frontend
 
 Desde `frontend/`:
