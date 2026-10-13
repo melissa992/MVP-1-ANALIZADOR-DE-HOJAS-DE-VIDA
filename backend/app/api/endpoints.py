@@ -6,8 +6,10 @@ from app.services.extraction_service import extract_text_from_pdf_service
 from app.services.llm_extraction_service import LLMServiceUnavailable
 from app.services.normalization_service import normalization_service
 from app.services.vacancy_service import vacancy_service
+from app.services.matching_service import matching_service
 from app.models.cv_schema import CandidateProfileSchema
 from app.schemas.vacancy import VacancyCreate, VacancyResponse
+from app.schemas.matching import MatchRequest, MatchResponse
 
 router = APIRouter()
 UPLOAD_DIR = "temp_storage"
@@ -163,3 +165,44 @@ def create_vacancy(vacancy_data: VacancyCreate):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al actualizar la vacante procesada: {str(e)}"
         )
+
+
+@router.post(
+    "/match/",
+    response_model=MatchResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Calcular score de idoneidad candidato-vacante (HU-07)",
+)
+def calculate_match(match_request: MatchRequest):
+    """
+    HU-07: Recibe el perfil estructurado de un candidato (HU-04) y
+    los requisitos estructurados de una vacante (HU-06), y retorna
+    un score numérico de idoneidad (0-100) junto con su justificación
+    y desglose por eje de ponderación.
+
+    Ponderación:
+    - Años de Experiencia y Cargo: 40%
+    - Habilidades Técnicas Clave:  40%
+    - Nivel de Estudios e Idiomas: 20%
+    """
+    try:
+        result = matching_service.calculate_fit_score(
+            candidate_data=match_request.candidate_data,
+            vacancy_data=match_request.vacancy_data,
+        )
+        return result
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Datos de entrada inválidos: {str(ve)}",
+        ) from ve
+    except RuntimeError as re:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(re),
+        ) from re
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error inesperado en el Matching Engine: {str(e)}",
+        ) from e

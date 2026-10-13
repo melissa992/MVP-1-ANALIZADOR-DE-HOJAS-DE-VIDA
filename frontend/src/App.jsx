@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import './App.css';
 import VacancyForm from './components/VacancyForm';
+import MatchingPanel from './components/matching/MatchingPanel';
 
 function App() {
   const [activeTab, setActiveTab] = useState('cvs');
@@ -134,8 +135,8 @@ function App() {
             type="button"
             onClick={() => setActiveTab('cvs')}
             className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${activeTab === 'cvs'
-                ? 'bg-[#315e50] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-[#315e50] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
           >
             Carga de Hojas de Vida (HU-01 / 04)
@@ -144,15 +145,37 @@ function App() {
             type="button"
             onClick={() => setActiveTab('vacancies')}
             className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${activeTab === 'vacancies'
-                ? 'bg-[#315e50] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-[#315e50] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
           >
             Registrar Vacante (HU-05)
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('matching')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${activeTab === 'matching'
+              ? 'bg-[#315e50] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+          >
+            Matching Engine (HU-07)
+          </button>
         </nav>
 
-        {activeTab === 'vacancies' ? (
+        {activeTab === 'matching' ? (
+          <div>
+            <section className="page-intro">
+              <div>
+                <p className="eyebrow">MATCHING ENGINE <span> / </span> HU-07</p>
+                <h1>Score de idoneidad</h1>
+                <p className="intro-copy">Evalúa la compatibilidad entre un candidato y una vacante. Pega los JSON estructurados y obtén un score numérico preciso con desglose por eje.</p>
+              </div>
+              <span className="module-label"><span className="module-dot" /> Módulo 03</span>
+            </section>
+            <MatchingPanel />
+          </div>
+        ) : activeTab === 'vacancies' ? (
           <div>
             <section className="page-intro">
               <div>
