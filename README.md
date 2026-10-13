@@ -81,6 +81,15 @@ Para probar la extracción desde Swagger:
 
 La interfaz web ofrece el mismo flujo: carga un PDF y selecciona **Ver texto extraído** en el resultado del archivo.
 
+## Detalle del candidato (HU-10)
+
+Los resultados asociados a una vacante desde `POST /match/` guardan el perfil estructurado
+y la evaluación de matching en `temp_storage/`. En el dashboard, **Ver Detalle** solicita
+`GET /candidates/{candidate_id}/detail?vacancy_id={vacancy_id}` y muestra la experiencia,
+habilidades, estudios, idiomas, desglose del score, fortalezas, brechas y resumen ejecutivo.
+Los rankings guardados antes de esta funcionalidad no contienen la ficha completa; vuelve
+a calcular el matching asociado a la vacante para generar el detalle.
+
 ## Comandos útiles del frontend
 
 Desde `frontend/`:

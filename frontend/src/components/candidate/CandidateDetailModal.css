@@ -1,0 +1,241 @@
+.candidate-modal-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #14251dcc;
+}
+
+.candidate-detail-modal {
+  width: min(900px, 100%);
+  max-height: min(92vh, 900px);
+  overflow-y: auto;
+  padding: clamp(20px, 4vw, 36px);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 24px 70px #0003;
+}
+
+.candidate-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.candidate-detail-header h2 {
+  margin: 5px 0;
+  color: #19362d;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+}
+
+.candidate-detail-eyebrow {
+  margin: 0;
+  color: #56806d;
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.candidate-detail-role {
+  margin: 0;
+  color: #68776f;
+}
+
+.candidate-detail-close {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: #6c7c72;
+  font-size: 1.8rem;
+  cursor: pointer;
+}
+
+.candidate-detail-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+  color: #617168;
+  font-size: 0.82rem;
+}
+
+.candidate-detail-content {
+  display: grid;
+  gap: 18px;
+}
+
+.candidate-detail-section {
+  padding: 20px;
+  border: 1px solid #e7ede8;
+  border-radius: 14px;
+}
+
+.candidate-detail-section > h3 {
+  margin: 0 0 16px;
+  color: #294438;
+  font-size: 1rem;
+}
+
+.candidate-explanation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.candidate-insight,
+.candidate-executive-summary {
+  padding: 14px;
+  border-radius: 11px;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.candidate-insight h4,
+.candidate-executive-summary h4 {
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+}
+
+.candidate-insight ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.candidate-insight p,
+.candidate-executive-summary p {
+  margin: 0;
+}
+
+.candidate-strengths {
+  color: #17633d;
+  background: #eff8f1;
+}
+
+.candidate-gaps {
+  color: #925b12;
+  background: #fff7e9;
+}
+
+.candidate-executive-summary {
+  margin-top: 12px;
+  color: #45564c;
+  background: #f5f7f5;
+}
+
+.candidate-breakdown,
+.candidate-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.candidate-breakdown > div,
+.candidate-profile-grid > div {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border-radius: 9px;
+  background: #f6f8f6;
+  font-size: 0.76rem;
+}
+
+.candidate-breakdown span,
+.candidate-profile-grid span {
+  color: #748078;
+}
+
+.candidate-breakdown strong,
+.candidate-profile-grid strong {
+  color: #334a3d;
+  overflow-wrap: anywhere;
+}
+
+.candidate-subheading {
+  margin: 18px 0 10px;
+  color: #53645a;
+  font-size: 0.8rem;
+}
+
+.candidate-detail-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.candidate-detail-pills span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #426653;
+  background: #eef5ef;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.candidate-detail-pills p {
+  margin: 0;
+  color: #89948c;
+  font-size: 0.8rem;
+}
+
+.candidate-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.candidate-history-list article {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-left: 3px solid #8eaf97;
+  border-radius: 6px;
+  background: #f7f9f7;
+  color: #68776f;
+  font-size: 0.8rem;
+}
+
+.candidate-history-list article strong {
+  color: #30463a;
+}
+
+.candidate-history-list article p {
+  margin: 5px 0 0;
+}
+
+.candidate-detail-state,
+.candidate-detail-error {
+  padding: 14px;
+  border-radius: 10px;
+  color: #526258;
+  background: #f5f8f5;
+}
+
+.candidate-detail-error {
+  color: #9f3030;
+  background: #fff2f0;
+}
+
+@media (max-width: 600px) {
+  .candidate-modal-backdrop {
+    padding: 8px;
+  }
+
+  .candidate-detail-modal {
+    max-height: 96vh;
+    padding: 18px;
+    border-radius: 14px;
+  }
+
+  .candidate-explanation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .candidate-detail-section {
+    padding: 15px;
+  }
+}

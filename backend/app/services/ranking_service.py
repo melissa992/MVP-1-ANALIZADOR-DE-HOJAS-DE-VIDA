@@ -6,6 +6,10 @@ from pathlib import Path
 from typing import Literal
 
 from app.schemas.matching import MatchResponse
+from app.schemas.candidate import (
+    CandidateDetailResponse,
+    CandidateExplanation,
+)
 from app.schemas.ranking import CandidateRankingItem, VacancyRankingResponse
 from app.schemas.vacancy import VacancyResponse
 
@@ -102,12 +106,122 @@ class RankingService:
         vacancy_key = hashlib.sha256(str(vacancy.id).encode("utf-8")).hexdigest()
         record_path = self.storage_dir / f"ranking_{vacancy_key}_{candidate_id}.json"
         temporary_path = record_path.with_suffix(".tmp")
-        record = {"vacancy_id": str(vacancy.id), "candidate": candidate.model_dump()}
+        record = {
+            "vacancy_id": str(vacancy.id),
+            "candidate": candidate.model_dump(),
+            "candidate_data": candidate_data,
+            "match_result": match_result.model_dump(mode="json"),
+        }
         temporary_path.write_text(
             json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         temporary_path.replace(record_path)
         return candidate
+
+    def get_candidate_detail(
+        self,
+        candidate_id: str,
+        vacancy_id: str,
+        vacancy: VacancyResponse | None = None,
+    ) -> CandidateDetailResponse | None:
+        if not re.fullmatch(r"[a-f0-9]{64}", candidate_id):
+            return None
+        vacancy = vacancy or self._load_vacancy(vacancy_id)
+        if vacancy is None:
+            return None
+
+        vacancy_key = hashlib.sha256(vacancy_id.encode("utf-8")).hexdigest()
+        detail_path = self.storage_dir / f"ranking_{vacancy_key}_{candidate_id}.json"
+        if not detail_path.is_file():
+            return None
+        with detail_path.open(encoding="utf-8") as detail_file:
+            record = json.load(detail_file)
+        if (
+            str(record.get("vacancy_id")) != vacancy_id
+            or not isinstance(record.get("candidate_data"), dict)
+            or not isinstance(record.get("match_result"), dict)
+        ):
+            return None
+
+        profile = record["candidate_data"]
+        match_result = MatchResponse(**record["match_result"])
+        name = (
+            profile.get("nombre_completo")
+            or profile.get("candidate_name")
+            or record.get("candidate", {}).get("candidate_name")
+            or "Candidato sin nombre"
+        )
+        experience = profile.get("experiencia")
+        if not isinstance(experience, list):
+            experience = []
+        education = profile.get("educacion")
+        if not isinstance(education, list):
+            education = []
+        skills = profile.get("habilidades")
+        if not isinstance(skills, list):
+            skills = []
+        languages = profile.get("idiomas")
+        if not isinstance(languages, list):
+            languages = []
+
+        strengths = [
+            self._format_requirement(item, "Cumplido")
+            for item in match_result.requirements_met
+        ]
+        gaps = [
+            self._format_requirement(item, "Parcial")
+            for item in match_result.requirements_partial
+        ] + [
+            self._format_requirement(item, "Faltante")
+            for item in match_result.requirements_missing
+        ]
+        first_experience = next(
+            (item for item in experience if isinstance(item, dict)), {}
+        )
+        cargo = (
+            profile.get("cargo_objetivo")
+            or first_experience.get("cargo")
+            or vacancy.title
+        )
+        education_level = (
+            profile.get("nivel_estudios")
+            or profile.get("education_level")
+            or ", ".join(
+                str(item.get("titulo"))
+                for item in education
+                if isinstance(item, dict) and item.get("titulo")
+            )
+            or "No especificado"
+        )
+
+        return CandidateDetailResponse(
+            candidate_id=candidate_id,
+            candidate_name=str(name),
+            email=profile.get("correo") or profile.get("email"),
+            phone=profile.get("telefono") or profile.get("phone"),
+            experience_years=self._experience_years(profile),
+            skills=[str(value) for value in skills if value],
+            education_level=str(education_level),
+            languages=[str(value) for value in languages if value],
+            score=match_result.score,
+            breakdown=match_result.breakdown.model_dump(),
+            explanation=CandidateExplanation(
+                puntos_fuertes=strengths,
+                brechas_detectadas=gaps,
+                justificacion_resumida=match_result.justification,
+            ),
+            vacancy_title=vacancy.title,
+            cargo=str(cargo),
+            experience=experience,
+            education=education,
+        )
+
+    @staticmethod
+    def _format_requirement(requirement, status: str) -> str:
+        return (
+            f"{status}: {requirement.requirement} "
+            f"(evidencia: {requirement.evidence})"
+        )
 
     def _load_vacancy(self, vacancy_id: str) -> VacancyResponse | None:
         if not re.fullmatch(r"[A-Za-z0-9-]+", vacancy_id):

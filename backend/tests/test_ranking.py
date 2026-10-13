@@ -175,4 +175,12 @@ def test_match_endpoint_persists_associated_candidate_for_ranking(tmp_path, monk
     ranking_response = client.get(f"/ranking/{VACANCY_ID}")
     assert ranking_response.status_code == 200
     assert ranking_response.json()["total_candidates"] == 1
+    candidate_id = ranking_response.json()["candidates"][0]["candidate_id"]
     assert ranking_response.json()["candidates"][0]["candidate_name"] == "Laura Gómez"
+
+    detail_response = client.get(
+        f"/candidates/{candidate_id}/detail",
+        params={"vacancy_id": VACANCY_ID},
+    )
+    assert detail_response.status_code == 200
+    assert detail_response.json()["candidate_name"] == "Laura Gómez"
