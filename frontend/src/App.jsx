@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import './App.css';
+import VacancyForm from './components/VacancyForm';
 
 function App() {
+  const [activeTab, setActiveTab] = useState('cvs');
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [responseResult, setResponseResult] = useState(null);
@@ -61,7 +63,7 @@ function App() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Error en el servidor');
-      
+
       setResponseResult(data);
     } catch (err) {
       setErrorMsg(err.message);
@@ -126,151 +128,192 @@ function App() {
       </header>
 
       <main className="workspace" id="top">
-        <section className="page-intro">
+        {/* Selector de módulo / pestaña */}
+        <nav className="flex items-center gap-2 p-1.5 bg-slate-200/60 backdrop-blur-xs rounded-xl mb-8 max-w-fit border border-slate-300/50" aria-label="Secciones del sistema">
+          <button
+            type="button"
+            onClick={() => setActiveTab('cvs')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${activeTab === 'cvs'
+                ? 'bg-[#315e50] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+          >
+            Carga de Hojas de Vida (HU-01 / 04)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('vacancies')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${activeTab === 'vacancies'
+                ? 'bg-[#315e50] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+          >
+            Registrar Vacante (HU-05)
+          </button>
+        </nav>
+
+        {activeTab === 'vacancies' ? (
           <div>
-            <p className="eyebrow">GESTIÓN DE CANDIDATURAS <span> / </span> INGESTA</p>
-            <h1>Carga de hojas de vida</h1>
-            <p className="intro-copy">Incorpora currículums para iniciar su análisis y organizar tus candidaturas.</p>
-          </div>
-          <span className="module-label"><span className="module-dot" /> Módulo 01</span>
-        </section>
-
-        <div className="content-grid">
-          <section className="upload-panel" aria-labelledby="upload-heading">
-            <div className="panel-heading">
+            <section className="page-intro">
               <div>
-                <span className="step-label">PASO 1 DE 1</span>
-                <h2 id="upload-heading">Añade tus documentos</h2>
-                <p>Selecciona archivos PDF desde tu equipo o arrástralos al área de carga.</p>
+                <p className="eyebrow">GESTIÓN DE TALENTO <span> / </span> HU-05</p>
+                <h1>Registro de vacantes</h1>
+                <p className="intro-copy">Registra las especificaciones de tus ofertas laborales para habilitar el screening y matching inteligente.</p>
               </div>
-              <span className="pdf-badge">PDF</span>
-            </div>
+              <span className="module-label"><span className="module-dot" /> Módulo 02</span>
+            </section>
 
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-              onClick={() => document.getElementById('hiddenFileInput').click()}
-              className="dropzone"
-            >
-              <span className="upload-icon-wrap" aria-hidden="true">
-                <svg className="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15.5v3A1.5 1.5 0 006.5 20h11a1.5 1.5 0 001.5-1.5v-3" />
-                </svg>
-              </span>
-              <span className="dropzone-title">Arrastra tus archivos aquí</span>
-              <span className="dropzone-subtitle">o <span className="browse-link">explora tu equipo</span></span>
-              <span className="dropzone-note">PDF · Hasta 20 archivos · Máximo 10 MB por archivo</span>
-              <input
-                id="hiddenFileInput"
-                type="file"
-                multiple
-                accept=".pdf"
-                className="visually-hidden"
-                onChange={handleFileSelect}
-              />
-            </div>
-
-            {errorMsg && (
-              <div className="error-message" role="alert">
-                <span className="error-icon" aria-hidden="true">!</span>
-                {errorMsg}
+            <VacancyForm />
+          </div>
+        ) : (
+          <>
+            <section className="page-intro">
+              <div>
+                <p className="eyebrow">GESTIÓN DE CANDIDATURAS <span> / </span> INGESTA</p>
+                <h1>Carga de hojas de vida</h1>
+                <p className="intro-copy">Incorpora currículums para iniciar su análisis y organizar tus candidaturas.</p>
               </div>
-            )}
+              <span className="module-label"><span className="module-dot" /> Módulo 01</span>
+            </section>
 
-            {files.length > 0 && (
-              <div className="selected-files">
-                <div className="files-heading">
-                  <h3>Archivos seleccionados <span className="file-count">{files.length}</span></h3>
-                  <button onClick={() => setFiles([])} className="clear-button">Limpiar lista</button>
+            <div className="content-grid">
+              <section className="upload-panel" aria-labelledby="upload-heading">
+                <div className="panel-heading">
+                  <div>
+                    <span className="step-label">PASO 1 DE 1</span>
+                    <h2 id="upload-heading">Añade tus documentos</h2>
+                    <p>Selecciona archivos PDF desde tu equipo o arrástralos al área de carga.</p>
+                  </div>
+                  <span className="pdf-badge">PDF</span>
                 </div>
 
-                <div className="file-list">
-                  {files.map((file, idx) => (
-                    <div key={idx} className="file-row">
-                      <span className="file-type-icon" aria-hidden="true">PDF</span>
-                      <span className="file-name">{file.name}</span>
-                      <span className="file-size">{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={handleUpload}
-                  disabled={loading}
-                  className="submit-button"
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                  onClick={() => document.getElementById('hiddenFileInput').click()}
+                  className="dropzone"
                 >
-                  {loading ? (
-                    <>
-                      <svg className="spinner" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                        <circle className="spinner-track" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
-                        <path className="spinner-head" fill="currentColor" d="M12 3a9 9 0 00-9 9h3a6 6 0 016-6V3z" />
-                      </svg>
-                      Procesando documentos...
-                    </>
-                  ) : (
-                    `Analizar y registrar ${files.length} CV(s)`
-                  )}
-                </button>
-              </div>
-            )}
-
-            {responseResult && (
-              <div className="result-panel">
-                <h3><span className="success-dot" /> Resultado de la carga</h3>
-                <div className="uploaded-results">
-                  {(responseResult.results || []).map((uploadedFile, index) => (
-                    <div className="uploaded-file-row" key={uploadedFile.file_id || `${uploadedFile.filename}-${index}`}>
-                      <span className={`file-type-icon ${uploadedFile.status === 'error' ? 'file-type-error' : ''}`} aria-hidden="true">
-                        {uploadedFile.status === 'success' ? 'PDF' : '!'}
-                      </span>
-                      <span className="uploaded-file-name" title={uploadedFile.filename}>{uploadedFile.filename}</span>
-                      {uploadedFile.status === 'success' ? (
-                        <div className="file-actions">
-                          <button
-                            type="button"
-                            className="extract-button"
-                            onClick={() => handleAnalyzeProfile(uploadedFile)}
-                            disabled={Boolean(extractingFileId || analyzingFileId)}
-                          >
-                            {analyzingFileId === uploadedFile.file_id ? 'Analizando...' : 'Analizar con IA'}
-                          </button>
-                          <button
-                            type="button"
-                            className="extract-button extract-button-secondary"
-                            onClick={() => handleExtractText(uploadedFile)}
-                            disabled={Boolean(extractingFileId || analyzingFileId)}
-                          >
-                            {extractingFileId === uploadedFile.file_id ? 'Extrayendo...' : 'Ver texto extraído'}
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="upload-status-error" title={uploadedFile.message}>No se pudo cargar</span>
-                      )}
-                    </div>
-                  ))}
+                  <span className="upload-icon-wrap" aria-hidden="true">
+                    <svg className="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15.5v3A1.5 1.5 0 006.5 20h11a1.5 1.5 0 001.5-1.5v-3" />
+                    </svg>
+                  </span>
+                  <span className="dropzone-title">Arrastra tus archivos aquí</span>
+                  <span className="dropzone-subtitle">o <span className="browse-link">explora tu equipo</span></span>
+                  <span className="dropzone-note">PDF · Hasta 20 archivos · Máximo 10 MB por archivo</span>
+                  <input
+                    id="hiddenFileInput"
+                    type="file"
+                    multiple
+                    accept=".pdf"
+                    className="visually-hidden"
+                    onChange={handleFileSelect}
+                  />
                 </div>
-              </div>
-            )}
-          </section>
 
-          <aside className="guidance-panel" aria-label="Información de carga">
-            <div className="guidance-topline"><span className="guidance-mark">i</span> INFORMACIÓN</div>
-            <h2>Todo listo para empezar</h2>
-            <p>Sube los currículums y deja que el sistema prepare la información para tu proceso de selección.</p>
-            <div className="guidance-divider" />
-            <div className="requirements-title">Requisitos de carga</div>
-            <div className="requirement-row"><span className="check-mark">✓</span><span>Formato PDF</span></div>
-            <div className="requirement-row"><span className="check-mark">✓</span><span>Hasta 20 documentos por carga</span></div>
-            <div className="requirement-row"><span className="check-mark">✓</span><span>Máximo 10 MB por documento</span></div>
-            <div className="privacy-note">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" d="M12 3l8 3v5c0 5-3.5 8.2-8 10-4.5-1.8-8-5-8-10V6l8-3z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" d="M9 12l2 2 4-4" />
-              </svg>
-              Tus documentos se procesan de forma segura.
+                {errorMsg && (
+                  <div className="error-message" role="alert">
+                    <span className="error-icon" aria-hidden="true">!</span>
+                    {errorMsg}
+                  </div>
+                )}
+
+                {files.length > 0 && (
+                  <div className="selected-files">
+                    <div className="files-heading">
+                      <h3>Archivos seleccionados <span className="file-count">{files.length}</span></h3>
+                      <button onClick={() => setFiles([])} className="clear-button">Limpiar lista</button>
+                    </div>
+
+                    <div className="file-list">
+                      {files.map((file, idx) => (
+                        <div key={idx} className="file-row">
+                          <span className="file-type-icon" aria-hidden="true">PDF</span>
+                          <span className="file-name">{file.name}</span>
+                          <span className="file-size">{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={handleUpload}
+                      disabled={loading}
+                      className="submit-button"
+                    >
+                      {loading ? (
+                        <>
+                          <svg className="spinner" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle className="spinner-track" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
+                            <path className="spinner-head" fill="currentColor" d="M12 3a9 9 0 00-9 9h3a6 6 0 016-6V3z" />
+                          </svg>
+                          Procesando documentos...
+                        </>
+                      ) : (
+                        `Analizar y registrar ${files.length} CV(s)`
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {responseResult && (
+                  <div className="result-panel">
+                    <h3><span className="success-dot" /> Resultado de la carga</h3>
+                    <div className="uploaded-results">
+                      {(responseResult.results || []).map((uploadedFile, index) => (
+                        <div className="uploaded-file-row" key={uploadedFile.file_id || `${uploadedFile.filename}-${index}`}>
+                          <span className={`file-type-icon ${uploadedFile.status === 'error' ? 'file-type-error' : ''}`} aria-hidden="true">
+                            {uploadedFile.status === 'success' ? 'PDF' : '!'}
+                          </span>
+                          <span className="uploaded-file-name" title={uploadedFile.filename}>{uploadedFile.filename}</span>
+                          {uploadedFile.status === 'success' ? (
+                            <div className="file-actions">
+                              <button
+                                type="button"
+                                className="extract-button"
+                                onClick={() => handleAnalyzeProfile(uploadedFile)}
+                                disabled={Boolean(extractingFileId || analyzingFileId)}
+                              >
+                                {analyzingFileId === uploadedFile.file_id ? 'Analizando...' : 'Analizar con IA'}
+                              </button>
+                              <button
+                                type="button"
+                                className="extract-button extract-button-secondary"
+                                onClick={() => handleExtractText(uploadedFile)}
+                                disabled={Boolean(extractingFileId || analyzingFileId)}
+                              >
+                                {extractingFileId === uploadedFile.file_id ? 'Extrayendo...' : 'Ver texto extraído'}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="upload-status-error" title={uploadedFile.message}>No se pudo cargar</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <aside className="guidance-panel" aria-label="Información de carga">
+                <div className="guidance-topline"><span className="guidance-mark">i</span> INFORMACIÓN</div>
+                <h2>Todo listo para empezar</h2>
+                <p>Sube los currículums y deja que el sistema prepare la información para tu proceso de selección.</p>
+                <div className="guidance-divider" />
+                <div className="requirements-title">Requisitos de carga</div>
+                <div className="requirement-row"><span className="check-mark">✓</span><span>Formato PDF</span></div>
+                <div className="requirement-row"><span className="check-mark">✓</span><span>Hasta 20 documentos por carga</span></div>
+                <div className="requirement-row"><span className="check-mark">✓</span><span>Máximo 10 MB por documento</span></div>
+                <div className="privacy-note">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" d="M12 3l8 3v5c0 5-3.5 8.2-8 10-4.5-1.8-8-5-8-10V6l8-3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" d="M9 12l2 2 4-4" />
+                  </svg>
+                  Tus documentos se procesan de forma segura.
+                </div>
+              </aside>
             </div>
-          </aside>
-        </div>
+          </>
+        )}
       </main>
 
       <footer className="footer">
