@@ -1,0 +1,269 @@
+.ranking-dashboard {
+  padding: clamp(20px, 4vw, 36px);
+  border: 1px solid #dfe8e1;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 16px 45px #2445380b;
+}
+
+.ranking-dashboard-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.ranking-dashboard-heading h2,
+.ranking-detail-dialog h2 {
+  margin: 5px 0 8px;
+  color: #19362d;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+}
+
+.ranking-dashboard-heading p:not(.ranking-eyebrow) {
+  margin: 0;
+  color: #68776f;
+}
+
+.ranking-eyebrow {
+  margin: 0;
+  color: #56806d;
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.ranking-vacancy-field,
+.ranking-filters label {
+  display: grid;
+  gap: 8px;
+  color: #53645a;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ranking-vacancy-field {
+  min-width: min(300px, 100%);
+}
+
+.ranking-vacancy-field select,
+.ranking-filters input {
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid #dbe4dc;
+  border-radius: 9px;
+  background: #fff;
+  color: #243b31;
+  font: inherit;
+}
+
+.ranking-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #e7ede8;
+  border-radius: 14px;
+  background: #f8faf8;
+}
+
+.ranking-filters label {
+  min-width: 120px;
+}
+
+.ranking-filters .ranking-skill-filter {
+  flex: 1;
+}
+
+.ranking-clear-button,
+.ranking-detail-button {
+  min-height: 40px;
+  padding: 9px 15px;
+  border: 1px solid #cbd9cf;
+  border-radius: 9px;
+  background: #fff;
+  color: #315e50;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.ranking-clear-button:hover,
+.ranking-detail-button:hover {
+  background: #eff6f0;
+}
+
+.ranking-error,
+.ranking-empty,
+.ranking-status {
+  margin: 20px 0 0;
+  padding: 16px;
+  border-radius: 10px;
+  color: #526258;
+  background: #f5f8f5;
+  font-size: 0.9rem;
+}
+
+.ranking-error {
+  color: #9f3030;
+  background: #fff2f0;
+}
+
+.ranking-result-count {
+  margin: 22px 0 10px;
+  color: #617168;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.ranking-table-scroll {
+  overflow-x: auto;
+}
+
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.ranking-table th,
+.ranking-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #edf1ed;
+  color: #43544a;
+  font-size: 0.82rem;
+  vertical-align: middle;
+}
+
+.ranking-table thead th {
+  color: #68776f;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ranking-table thead button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.ranking-table tbody th {
+  min-width: 150px;
+  color: #243b31;
+  font-weight: 750;
+}
+
+.ranking-match-badge {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ranking-match-high {
+  color: #17633d;
+  background: #e6f5eb;
+}
+
+.ranking-match-medium {
+  color: #865b00;
+  background: #fff4d6;
+}
+
+.ranking-match-low {
+  color: #a33131;
+  background: #fde8e6;
+}
+
+.ranking-skill-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 120px;
+}
+
+.ranking-skill-pill {
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #426653;
+  background: #eef5ef;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.ranking-no-skills {
+  color: #89948c;
+  font-size: 0.72rem;
+}
+
+.ranking-modal-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #14251dcc;
+}
+
+.ranking-detail-dialog {
+  position: relative;
+  width: min(480px, 100%);
+  padding: 30px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px #0003;
+}
+
+.ranking-detail-dialog h3 {
+  margin: 24px 0 12px;
+  color: #30463a;
+  font-size: 0.95rem;
+}
+
+.ranking-detail-close {
+  position: absolute;
+  top: 12px;
+  right: 15px;
+  border: 0;
+  background: transparent;
+  color: #6c7c72;
+  font-size: 1.7rem;
+  cursor: pointer;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+@media (max-width: 720px) {
+  .ranking-dashboard-heading,
+  .ranking-filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ranking-vacancy-field,
+  .ranking-filters label {
+    min-width: 0;
+  }
+
+  .ranking-table {
+    min-width: 760px;
+  }
+}

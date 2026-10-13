@@ -35,6 +35,10 @@ class MatchRequest(BaseModel):
             }
         ],
     )
+    vacancy_id: str | None = Field(
+        default=None,
+        description="ID de la vacante a la que asociar este resultado para el ranking.",
+    )
 
 
 class RequirementEvidence(BaseModel):

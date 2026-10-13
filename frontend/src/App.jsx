@@ -2,6 +2,7 @@ import { useState } from 'react';
 import './App.css';
 import VacancyForm from './components/VacancyForm';
 import MatchingPanel from './components/matching/MatchingPanel';
+import RankingDashboard from './components/ranking/RankingDashboard';
 
 function App() {
   const [activeTab, setActiveTab] = useState('cvs');
@@ -161,9 +162,31 @@ function App() {
           >
             Matching Engine (HU-07)
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('ranking')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${activeTab === 'ranking'
+              ? 'bg-[#315e50] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+          >
+            Ranking de candidatos (HU-09)
+          </button>
         </nav>
 
-        {activeTab === 'matching' ? (
+        {activeTab === 'ranking' ? (
+          <div>
+            <section className="page-intro">
+              <div>
+                <p className="eyebrow">GESTIÓN DE TALENTO <span> / </span> HU-09</p>
+                <h1>Ranking de candidatos</h1>
+                <p className="intro-copy">Compara los resultados de matching, filtra por score o habilidad y encuentra los perfiles con mayor ajuste.</p>
+              </div>
+              <span className="module-label"><span className="module-dot" /> Módulo 04</span>
+            </section>
+            <RankingDashboard />
+          </div>
+        ) : activeTab === 'matching' ? (
           <div>
             <section className="page-intro">
               <div>
