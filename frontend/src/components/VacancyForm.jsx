@@ -39,10 +39,6 @@ export default function VacancyForm({ onSuccess }) {
       const result = await createVacancy(cleanTitle, cleanDescription);
       setCreatedVacancy(result);
 
-      // Limpiar el formulario tras registro exitoso
-      setTitle('');
-      setRawDescription('');
-
       if (onSuccess && typeof onSuccess === 'function') {
         onSuccess(result);
       }
@@ -58,6 +54,13 @@ export default function VacancyForm({ onSuccess }) {
     setCreatedVacancy(null);
   };
 
+  const handleClearForm = () => {
+    setTitle('');
+    setRawDescription('');
+    setErrorMsg('');
+    setCreatedVacancy(null);
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Contenedor principal de la tarjeta */}
@@ -68,7 +71,7 @@ export default function VacancyForm({ onSuccess }) {
             <div>
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-100/70 text-[#274b40] text-xs font-semibold tracking-wide uppercase mb-2">
                 <span className="w-2 h-2 rounded-full bg-[#315e50] animate-pulse"></span>
-                HU-05 · Módulo de Reclutamiento
+                Módulo de Reclutamiento
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-850 tracking-tight text-[#1c2c26]">
                 Registro de Nueva Vacante
@@ -122,7 +125,7 @@ export default function VacancyForm({ onSuccess }) {
             {createdVacancy.structured_requirements && (
               <div className="mt-2 pt-3 border-t border-emerald-200/70 text-xs text-slate-800 bg-white/70 rounded-lg p-3">
                 <div className="font-bold text-emerald-950 mb-2 flex items-center gap-1.5">
-                  <span>✨ Requisitos estructurados con LLM (HU-06):</span>
+                  <span>✨ Requisitos estructurados con IA:</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[12px]">
                   <div><span className="font-semibold text-slate-600">Cargo normalizado:</span> {createdVacancy.structured_requirements.cargo || 'No especificado'}</div>
@@ -241,10 +244,8 @@ export default function VacancyForm({ onSuccess }) {
               {(title || rawDescription) && !loading && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setTitle('');
-                    setRawDescription('');
-                  }}
+                  onClick={handleClearForm}
+                  disabled={loading}
                   className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   Limpiar campos

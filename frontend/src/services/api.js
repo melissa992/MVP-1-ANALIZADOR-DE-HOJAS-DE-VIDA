@@ -1,4 +1,69 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const ACCESS_TOKEN_KEY = 'cv-match-access-token';
+
+export function getAccessToken() {
+  return window.localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function storeAccessToken(token) {
+  window.localStorage.setItem(ACCESS_TOKEN_KEY, token);
+}
+
+export function clearAccessToken() {
+  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+}
+
+export async function apiFetch(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  const token = getAccessToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  if (response.status === 401) {
+    clearAccessToken();
+    window.dispatchEvent(new Event('auth-expired'));
+  }
+  return response;
+}
+
+export async function login(email, password) {
+  const response = await apiFetch('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: No fue posible iniciar sesión.`,
+    );
+  }
+
+  storeAccessToken(data.access_token);
+  return data;
+}
+
+export async function getCurrentUser() {
+  const response = await apiFetch('/me', { headers: { Accept: 'application/json' } });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: La sesión ya no es válida.`,
+    );
+  }
+  return data;
+}
+
+export async function logout() {
+  try {
+    await apiFetch('/logout', { method: 'POST' });
+  } finally {
+    clearAccessToken();
+  }
+}
 
 /**
  * Registra una nueva vacante en el sistema (HU-05).
@@ -17,7 +82,7 @@ export async function createVacancy(title, rawDescription) {
     throw new Error('La descripción de la vacante es obligatoria.');
   }
 
-  const response = await fetch(`${API_BASE_URL}/vacancies/`, {
+  const response = await apiFetch('/vacancies/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -59,7 +124,7 @@ export async function calculateMatch(candidateData, vacancyData, vacancyId) {
     throw new Error('Los datos de la vacante son obligatorios y deben ser un objeto JSON.');
   }
 
-  const response = await fetch(`${API_BASE_URL}/match/`, {
+  const response = await apiFetch('/match/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -87,7 +152,7 @@ export async function calculateMatch(candidateData, vacancyData, vacancyId) {
 }
 
 export async function listVacancies() {
-  const response = await fetch(`${API_BASE_URL}/vacancies/`, {
+  const response = await apiFetch('/vacancies/', {
     headers: { Accept: 'application/json' },
   });
   const data = await response.json().catch(() => null);
@@ -114,8 +179,8 @@ export async function getVacancyRanking(vacancyId, filters = {}) {
     }
   });
   const suffix = query.size ? `?${query.toString()}` : '';
-  const response = await fetch(
-    `${API_BASE_URL}/ranking/${encodeURIComponent(vacancyId)}${suffix}`,
+  const response = await apiFetch(
+    `/ranking/${encodeURIComponent(vacancyId)}${suffix}`,
     { headers: { Accept: 'application/json' } },
   );
   const data = await response.json().catch(() => null);
@@ -136,8 +201,8 @@ export async function getCandidateDetail(candidateId, vacancyId) {
   }
 
   const query = new URLSearchParams({ vacancy_id: vacancyId });
-  const response = await fetch(
-    `${API_BASE_URL}/candidates/${encodeURIComponent(candidateId)}/detail?${query}`,
+  const response = await apiFetch(
+    `/candidates/${encodeURIComponent(candidateId)}/detail?${query}`,
     { headers: { Accept: 'application/json' } },
   );
   const data = await response.json().catch(() => null);
@@ -152,8 +217,36 @@ export async function getCandidateDetail(candidateId, vacancyId) {
   return data;
 }
 
+export async function generateInterviewGuide(candidateId, vacancyId) {
+  if (!candidateId || !vacancyId) {
+    throw new Error('Se requiere el candidato y la vacante para generar la guía.');
+  }
+
+  const response = await apiFetch('/candidates/generate-interview-questions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      candidate_id: candidateId,
+      vacancy_id: vacancyId,
+    }),
+  });
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: No fue posible generar la guía de entrevista.`,
+    );
+  }
+
+  return data;
+}
+
 export async function getFileStatus(fileId) {
-  const response = await fetch(`${API_BASE_URL}/status/${encodeURIComponent(fileId)}`, {
+  const response = await apiFetch(`/status/${encodeURIComponent(fileId)}`, {
     headers: { Accept: 'application/json' },
   });
   const data = await response.json().catch(() => null);
@@ -169,7 +262,7 @@ export async function getFileStatus(fileId) {
 }
 
 export async function retryFileProcessing(fileId) {
-  const response = await fetch(`${API_BASE_URL}/retry/${encodeURIComponent(fileId)}`, {
+  const response = await apiFetch(`/retry/${encodeURIComponent(fileId)}`, {
     method: 'POST',
     headers: { Accept: 'application/json' },
   });
@@ -186,11 +279,16 @@ export async function retryFileProcessing(fileId) {
 }
 
 export default {
+  apiFetch,
+  login,
+  getCurrentUser,
+  logout,
   createVacancy,
   calculateMatch,
   listVacancies,
   getVacancyRanking,
   getCandidateDetail,
+  generateInterviewGuide,
   getFileStatus,
   retryFileProcessing,
 };

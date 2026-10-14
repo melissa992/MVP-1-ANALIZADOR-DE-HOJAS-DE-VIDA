@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getCandidateDetail } from '../../services/api';
+import { generateInterviewGuide, getCandidateDetail } from '../../services/api';
+import RadarMatchChart from './RadarMatchChart';
 import './CandidateDetailModal.css';
 
 function DetailSection({ title, children }) {
@@ -14,9 +15,53 @@ function DetailSection({ title, children }) {
 function CandidateDetailModal({ candidateId, vacancyId, onClose }) {
   const [result, setResult] = useState(null);
   const [requestError, setRequestError] = useState(null);
+  const [interviewGuide, setInterviewGuide] = useState(null);
+  const [interviewLoading, setInterviewLoading] = useState(false);
+  const [interviewError, setInterviewError] = useState('');
+  const [copyMessage, setCopyMessage] = useState('');
   const candidate = result?.candidateId === candidateId ? result.data : null;
   const error = requestError?.candidateId === candidateId ? requestError.message : '';
   const loading = !candidate && !error;
+
+  const handleGenerateInterviewGuide = async () => {
+    setInterviewLoading(true);
+    setInterviewError('');
+    setCopyMessage('');
+    try {
+      setInterviewGuide(await generateInterviewGuide(candidateId, vacancyId));
+    } catch (guideError) {
+      setInterviewError(guideError.message);
+    } finally {
+      setInterviewLoading(false);
+    }
+  };
+
+  const handleCopyGuide = async () => {
+    const sections = [
+      `Guía de entrevista — ${interviewGuide.candidate_name}`,
+      `Vacante: ${interviewGuide.vacancy_title}`,
+      '',
+      'PREGUNTAS TÉCNICAS',
+      ...interviewGuide.technical_questions.flatMap((item, index) => [
+        `${index + 1}. ${item.question}`,
+        `   Objetivo: ${item.objective}`,
+        `   Seguimiento: ${item.follow_up}`,
+      ]),
+      '',
+      'PREGUNTAS COMPORTAMENTALES',
+      ...interviewGuide.behavioral_questions.flatMap((item, index) => [
+        `${index + 1}. ${item.question}`,
+        `   Objetivo: ${item.objective}`,
+        `   Seguimiento: ${item.follow_up}`,
+      ]),
+    ];
+    try {
+      await navigator.clipboard.writeText(sections.join('\n'));
+      setCopyMessage('Guía copiada al portapapeles.');
+    } catch {
+      setCopyMessage('No fue posible copiar automáticamente. Selecciona y copia las preguntas.');
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -109,14 +154,7 @@ function CandidateDetailModal({ candidateId, vacancyId, onClose }) {
                 <p>{candidate.explanation.justificacion_resumida}</p>
               </div>
               {candidate.breakdown && (
-                <div className="candidate-breakdown" aria-label="Desglose del score">
-                  {Object.entries(candidate.breakdown).map(([category, points]) => (
-                    <div key={category}>
-                      <span>{category}</span>
-                      <strong>{points.score}/{points.max_score}</strong>
-                    </div>
-                  ))}
-                </div>
+                <RadarMatchChart breakdown={candidate.breakdown} />
               )}
             </DetailSection>
 
@@ -170,6 +208,53 @@ function CandidateDetailModal({ candidateId, vacancyId, onClose }) {
                   ))}
                 </div>
               ) : <p>No se registró formación académica detallada.</p>}
+            </DetailSection>
+
+            <DetailSection title="Guía de entrevista con IA">
+              <p className="interview-guide-intro">
+                Genera preguntas a partir del perfil, las fortalezas, las brechas y los requisitos de esta vacante.
+              </p>
+              <button
+                type="button"
+                className="interview-generate-button"
+                onClick={handleGenerateInterviewGuide}
+                disabled={interviewLoading}
+              >
+                {interviewLoading ? (
+                  <>
+                    <span className="interview-button-spinner" aria-hidden="true" />
+                    Preparando guía...
+                  </>
+                ) : '🤖 Generar Guía de Entrevista con IA'}
+              </button>
+              {interviewError && <p className="interview-guide-error" role="alert">{interviewError}</p>}
+
+              {interviewGuide && (
+                <div className="interview-guide-results">
+                  <div className="interview-guide-toolbar">
+                    <span>Preguntas para {interviewGuide.candidate_name}</span>
+                    <button type="button" onClick={handleCopyGuide}>Copiar guía al portapapeles</button>
+                  </div>
+                  {copyMessage && <p className="interview-copy-message" role="status">{copyMessage}</p>}
+                  {[
+                    ['Preguntas técnicas', interviewGuide.technical_questions],
+                    ['Preguntas comportamentales', interviewGuide.behavioral_questions],
+                  ].map(([title, questions]) => (
+                    <section className="interview-question-group" key={title}>
+                      <h4>{title}</h4>
+                      <ol>
+                        {questions.map((item, index) => (
+                          <li key={`${title}-${index}`}>
+                            <strong>{item.question}</strong>
+                            <span><b>Objetivo:</b> {item.objective}</span>
+                            <span><b>Seguimiento:</b> {item.follow_up}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  ))}
+                </div>
+              )}
             </DetailSection>
           </div>
         )}

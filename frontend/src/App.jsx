@@ -3,10 +3,20 @@ import './App.css';
 import VacancyForm from './components/VacancyForm';
 import MatchingPanel from './components/matching/MatchingPanel';
 import RankingDashboard from './components/ranking/RankingDashboard';
-import { API_BASE_URL, getFileStatus, retryFileProcessing } from './services/api';
+import {
+  apiFetch,
+  getAccessToken,
+  getCurrentUser,
+  getFileStatus,
+  login,
+  logout,
+  retryFileProcessing,
+} from './services/api';
+import Login from './components/auth/Login';
 
-function App() {
+function Workspace({ currentUser, onLogout }) {
   const [activeTab, setActiveTab] = useState('cvs');
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set(['cvs']));
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [responseResult, setResponseResult] = useState(null);
@@ -18,6 +28,11 @@ function App() {
   const [fileStatuses, setFileStatuses] = useState({});
   const [retryingFileId, setRetryingFileId] = useState(null);
   const [showRawProfile, setShowRawProfile] = useState(false);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setVisitedTabs((previousTabs) => new Set(previousTabs).add(tab));
+  };
 
   useEffect(() => {
     const activeFileIds = Object.entries(fileStatuses)
@@ -110,7 +125,7 @@ function App() {
     });
 
     try {
-      const res = await fetch(`${API_BASE_URL}/upload-cv/`, {
+      const res = await apiFetch('/upload-cv/', {
         method: 'POST',
         body: formData,
       });
@@ -145,7 +160,7 @@ function App() {
     }));
 
     try {
-      const res = await fetch(`${API_BASE_URL}/extract-text/${encodeURIComponent(uploadedFile.file_id)}`, {
+      const res = await apiFetch(`/extract-text/${encodeURIComponent(uploadedFile.file_id)}`, {
         method: 'POST',
       });
       const data = await res.json();
@@ -176,7 +191,7 @@ function App() {
     }));
 
     try {
-      const res = await fetch(`${API_BASE_URL}/analyze-cv/${encodeURIComponent(uploadedFile.file_id)}`, {
+      const res = await apiFetch(`/analyze-cv/${encodeURIComponent(uploadedFile.file_id)}`, {
         method: 'POST',
       });
       const data = await res.json();
@@ -239,7 +254,8 @@ function App() {
         </a>
         <div className="topbar-meta">
           <span className="status-indicator" aria-hidden="true" />
-          <span>Plataforma de selección</span>
+          <span>{currentUser.email}</span>
+          <button type="button" className="logout-button" onClick={onLogout}>Cerrar sesión</button>
         </div>
       </header>
 
@@ -248,51 +264,52 @@ function App() {
         <nav className="flex items-center gap-2 p-1.5 bg-slate-200/60 backdrop-blur-xs rounded-xl mb-8 max-w-fit border border-slate-300/50" aria-label="Secciones del sistema">
           <button
             type="button"
-            onClick={() => setActiveTab('cvs')}
+            onClick={() => handleTabChange('cvs')}
             className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${activeTab === 'cvs'
               ? 'bg-[#315e50] text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
           >
-            Carga de Hojas de Vida (HU-01 / 04)
+            Carga de Hojas de Vida
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('vacancies')}
+            onClick={() => handleTabChange('vacancies')}
             className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${activeTab === 'vacancies'
               ? 'bg-[#315e50] text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
           >
-            Registrar Vacante (HU-05)
+            Registrar Vacantes
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('matching')}
+            onClick={() => handleTabChange('matching')}
             className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${activeTab === 'matching'
               ? 'bg-[#315e50] text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
           >
-            Matching Engine (HU-07)
+            Matching Engine
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('ranking')}
+            onClick={() => handleTabChange('ranking')}
             className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${activeTab === 'ranking'
               ? 'bg-[#315e50] text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
           >
-            Ranking de candidatos (HU-09)
+            Ranking de candidatos
           </button>
         </nav>
 
-        {activeTab === 'ranking' ? (
+        {visitedTabs.has('ranking') && (
+        <section hidden={activeTab !== 'ranking'}>
           <div>
             <section className="page-intro">
               <div>
-                <p className="eyebrow">GESTIÓN DE TALENTO <span> / </span> HU-09</p>
+                <p className="eyebrow">GESTIÓN DE TALENTO <span> / </span> Dashboard</p>
                 <h1>Ranking de candidatos</h1>
                 <p className="intro-copy">Compara los resultados de matching, filtra por score o habilidad y encuentra los perfiles con mayor ajuste.</p>
               </div>
@@ -300,11 +317,15 @@ function App() {
             </section>
             <RankingDashboard />
           </div>
-        ) : activeTab === 'matching' ? (
+        </section>
+        )}
+
+        {visitedTabs.has('matching') && (
+        <section hidden={activeTab !== 'matching'}>
           <div>
             <section className="page-intro">
               <div>
-                <p className="eyebrow">MATCHING ENGINE <span> / </span> HU-07</p>
+                <p className="eyebrow">MATCHING ENGINE <span> / </span> Score</p>
                 <h1>Score de idoneidad</h1>
                 <p className="intro-copy">Evalúa la compatibilidad entre un candidato y una vacante. Pega los JSON estructurados y obtén un score numérico preciso con desglose por eje.</p>
               </div>
@@ -312,11 +333,15 @@ function App() {
             </section>
             <MatchingPanel />
           </div>
-        ) : activeTab === 'vacancies' ? (
+        </section>
+        )}
+
+        {visitedTabs.has('vacancies') && (
+        <section hidden={activeTab !== 'vacancies'}>
           <div>
             <section className="page-intro">
               <div>
-                <p className="eyebrow">GESTIÓN DE TALENTO <span> / </span> HU-05</p>
+                <p className="eyebrow">GESTIÓN DE TALENTO <span> / </span> Vacantes</p>
                 <h1>Registro de vacantes</h1>
                 <p className="intro-copy">Registra las especificaciones de tus ofertas laborales para habilitar el screening y matching inteligente.</p>
               </div>
@@ -325,7 +350,11 @@ function App() {
 
             <VacancyForm />
           </div>
-        ) : (
+        </section>
+        )}
+
+        {visitedTabs.has('cvs') && (
+        <section hidden={activeTab !== 'cvs'}>
           <>
             <section className="page-intro">
               <div>
@@ -515,6 +544,7 @@ function App() {
               </aside>
             </div>
           </>
+        </section>
         )}
       </main>
 
@@ -600,7 +630,7 @@ function App() {
           >
             <div className="dialog-heading">
               <div>
-                <p className="dialog-eyebrow">ANÁLISIS INTELIGENTE · HU-03 / HU-04</p>
+                <p className="dialog-eyebrow">ANÁLISIS INTELIGENTE</p>
                 <h2 id="profile-title">Perfil estructurado</h2>
               </div>
               <button type="button" className="dialog-close" onClick={() => setProfileView(null)} aria-label="Cerrar ventana">
@@ -696,4 +726,55 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(Boolean(getAccessToken()));
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  useEffect(() => {
+    const handleExpiredSession = () => {
+      setCurrentUser(null);
+      setCheckingSession(false);
+    };
+    window.addEventListener('auth-expired', handleExpiredSession);
+
+    if (getAccessToken()) {
+      getCurrentUser()
+        .then(setCurrentUser)
+        .catch(() => setCurrentUser(null))
+        .finally(() => setCheckingSession(false));
+    }
+
+    return () => window.removeEventListener('auth-expired', handleExpiredSession);
+  }, []);
+
+  const handleLogin = async (email, password) => {
+    setLoginLoading(true);
+    setLoginError('');
+    try {
+      await login(email, password);
+      setCurrentUser(await getCurrentUser());
+    } catch (error) {
+      setLoginError(error.message);
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      setCurrentUser(null);
+    }
+  };
+
+  if (checkingSession) {
+    return <main className="session-loading" aria-live="polite">Verificando sesión segura...</main>;
+  }
+  if (!currentUser) {
+    return <Login onLogin={handleLogin} loading={loginLoading} error={loginError} />;
+  }
+  return <Workspace currentUser={currentUser} onLogout={handleLogout} />;
+}

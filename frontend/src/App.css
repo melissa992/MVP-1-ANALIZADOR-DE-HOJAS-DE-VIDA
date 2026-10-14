@@ -65,6 +65,32 @@
   font-weight: 550;
 }
 
+.logout-button {
+  margin-left: 8px;
+  padding: 7px 10px;
+  border: 1px solid #e1e8e2;
+  border-radius: 4px;
+  color: #526158;
+  background: #fff;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  border-color: #b9cbbd;
+  color: #315e50;
+}
+
+.session-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  color: #526158;
+  background: #f3f6f3;
+  font-size: 13px;
+}
+
 .status-indicator,
 .module-dot,
 .success-dot {

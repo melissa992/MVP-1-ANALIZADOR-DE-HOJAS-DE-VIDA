@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from app.api import endpoints
 from app.main import app
 from app.services import extraction_service
+from app.services.auth_service import auth_service
 from app.services.status_service import ProcessingStatus, status_service
 
 
@@ -36,6 +37,7 @@ def test_get_file_status_returns_current_status():
         ProcessingStatus.FAILED,
         "No fue posible extraer el texto.",
     )
+    auth_service.assign_resource("cv", file_id, auth_service.bootstrap_user_id)
 
     response = client.get(f"/status/{file_id}")
 
@@ -62,6 +64,7 @@ def test_retry_queues_existing_file_without_upload(monkeypatch, tmp_path):
         ProcessingStatus.FAILED,
         "Fallo previo.",
     )
+    auth_service.assign_resource("cv", file_id, auth_service.bootstrap_user_id)
 
     def complete_retry(retry_file_id):
         status_service.update_status(retry_file_id, ProcessingStatus.COMPLETED)
@@ -82,6 +85,7 @@ def test_retry_queues_existing_file_without_upload(monkeypatch, tmp_path):
 def test_analyze_updates_status_when_processing_fails(monkeypatch):
     file_id = str(uuid4())
     status_service.register_file(file_id)
+    auth_service.assign_resource("cv", file_id, auth_service.bootstrap_user_id)
 
     def fail_extraction(_file_id):
         from fastapi import HTTPException

@@ -2,6 +2,8 @@ from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.schemas.matching import MatchBreakdown
+
 
 class CandidateExplanation(BaseModel):
     puntos_fuertes: List[str] = Field(default_factory=list)
@@ -19,7 +21,7 @@ class CandidateDetailResponse(BaseModel):
     education_level: str
     languages: List[str] = Field(default_factory=list)
     score: int = Field(..., ge=0, le=100)
-    breakdown: Optional[dict[str, Any]] = None
+    breakdown: Optional[MatchBreakdown] = None
     explanation: CandidateExplanation
     vacancy_title: str
     cargo: str
