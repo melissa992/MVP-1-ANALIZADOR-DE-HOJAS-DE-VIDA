@@ -1,19 +1,33 @@
 import os
+from uuid import UUID
 import pdfplumber
 from fastapi import HTTPException
 
 UPLOAD_DIR = "temp_storage"
 
-def extract_text_from_pdf_service(file_id: str) -> dict:
-    file_path = os.path.join(UPLOAD_DIR, f"{file_id}.pdf")
-    
+
+def get_pdf_path(file_id: str) -> str:
+    try:
+        normalized_file_id = str(UUID(file_id))
+    except ValueError as error:
+        raise HTTPException(
+            status_code=404,
+            detail="El archivo especificado no existe o el identificador es incorrecto.",
+        ) from error
+
+    file_path = os.path.join(UPLOAD_DIR, f"{normalized_file_id}.pdf")
     # Validar si el archivo existe
     if not os.path.exists(file_path):
         raise HTTPException(
             status_code=404,
             detail="El archivo especificado no existe o el identificador es incorrecto."
         )
-    
+
+    return file_path
+
+
+def extract_text_from_pdf_service(file_id: str) -> dict:
+    file_path = get_pdf_path(file_id)
     extracted_text = ""
     pages_data = []
 
@@ -51,6 +65,8 @@ def extract_text_from_pdf_service(file_id: str) -> dict:
             "pages_summary": pages_data
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,

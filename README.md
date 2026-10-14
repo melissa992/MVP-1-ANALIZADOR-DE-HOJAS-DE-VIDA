@@ -81,6 +81,13 @@ Para probar la extracción desde Swagger:
 
 La interfaz web ofrece el mismo flujo: carga un PDF y selecciona **Ver texto extraído** en el resultado del archivo.
 
+Cada PDF cargado tiene un estado en memoria consultable con `GET /status/{file_id}`:
+`PENDING`, `EXTRACTING`, `ANALYZING`, `COMPLETED` o `FAILED` (con `error_message`).
+La interfaz actualiza los estados mientras se analiza y permite reintentar un fallo con
+`POST /retry/{file_id}`. El reintento usa el PDF ya almacenado y responde `202 Accepted`
+mientras ejecuta extracción y análisis en segundo plano. El registro es temporal: se pierde
+al reiniciar el backend, aunque los PDF almacenados se conserven.
+
 ## Detalle del candidato (HU-10)
 
 Los resultados asociados a una vacante desde `POST /match/` guardan el perfil estructurado
