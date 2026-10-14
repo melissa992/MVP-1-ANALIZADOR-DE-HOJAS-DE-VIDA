@@ -120,6 +120,7 @@ def test_swagger_exposes_candidate_profile_schema():
 
 def test_analyze_endpoint_returns_schema_validated_json(monkeypatch):
     from app.api import endpoints
+    from app.services.auth_service import auth_service
 
     monkeypatch.setattr(
         endpoints,
@@ -131,6 +132,7 @@ def test_analyze_endpoint_returns_schema_validated_json(monkeypatch):
         "process_and_normalize",
         lambda raw_text: CandidateProfileSchema(nombre_completo="Ana Perez"),
     )
+    auth_service.assign_resource("cv", "demo", auth_service.bootstrap_user_id)
 
     response = TestClient(app).post("/analyze-cv/demo")
 

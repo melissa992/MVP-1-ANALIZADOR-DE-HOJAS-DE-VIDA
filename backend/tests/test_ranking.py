@@ -13,6 +13,7 @@ from app.schemas.matching import (
 from app.schemas.vacancy import VacancyRequirements, VacancyResponse
 from app.services.matching_service import matching_service
 from app.services.ranking_service import ranking_service
+from app.services.auth_service import auth_service
 from app.services.vacancy_service import vacancy_service
 
 client = TestClient(app)
@@ -53,6 +54,9 @@ def prepared_ranking(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(vacancy_service, "get_vacancy", lambda _: vacancy)
     monkeypatch.setattr(ranking_service, "storage_dir", tmp_path)
+    auth_service.assign_resource(
+        "vacancy", VACANCY_ID, auth_service.bootstrap_user_id
+    )
 
     candidates = [
         ("Zoe Arango", 85, 6, "Python"),
@@ -153,6 +157,9 @@ def test_match_endpoint_persists_associated_candidate_for_ranking(tmp_path, monk
         structured_requirements=requirements,
     )
     monkeypatch.setattr(vacancy_service, "get_vacancy", lambda _: vacancy)
+    auth_service.assign_resource(
+        "vacancy", VACANCY_ID, auth_service.bootstrap_user_id
+    )
     monkeypatch.setattr(ranking_service, "storage_dir", tmp_path)
     monkeypatch.setattr(
         matching_service, "calculate_fit_score", lambda **_: make_match(85, "Python")

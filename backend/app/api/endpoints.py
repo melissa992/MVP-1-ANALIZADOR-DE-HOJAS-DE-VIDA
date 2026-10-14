@@ -1,11 +1,15 @@
 import logging
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from typing import List
 import json
 import os
 import uuid
 from app.services.extraction_service import extract_text_from_pdf_service
 from app.services.extraction_service import get_pdf_path
+from app.api.auth_dependencies import get_current_active_user, require_resource_owner
+from app.schemas.auth import LoginRequest, TokenResponse, UserResponse
+from app.services.auth_service import ActiveUser, auth_service
 from app.services.llm_extraction_service import LLMServiceUnavailable
 from app.services.status_service import ProcessingStatus, status_service
 from app.services.normalization_service import normalization_service
@@ -16,15 +20,52 @@ from app.schemas.vacancy import VacancyCreate, VacancyResponse
 from app.schemas.matching import MatchRequest, MatchResponse
 from app.schemas.ranking import VacancyRankingResponse
 from app.schemas.candidate import CandidateDetailResponse
+from app.schemas.interview import InterviewGuideRequest, InterviewGuideResponse
+from app.services.interview_service import InterviewServiceUnavailable, interview_service
 from app.services.ranking_service import ranking_service
 
 router = APIRouter()
 UPLOAD_DIR = "temp_storage"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 logger = logging.getLogger(__name__)
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(credentials: LoginRequest):
+    user = auth_service.authenticate(credentials.email, credentials.password)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Correo o contraseña incorrectos.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token, _, expires_at = auth_service.create_access_token(user)
+    return TokenResponse(access_token=token, expires_at=expires_at)
+
+
+@router.get("/me", response_model=UserResponse)
+def get_current_user(user: ActiveUser = Depends(get_current_active_user)):
+    return UserResponse(id=user.id, email=user.email)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    user: ActiveUser = Depends(get_current_active_user),
+):
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Debes iniciar sesión.")
+    token_id = auth_service.get_token_id(credentials.credentials)
+    if token_id is not None:
+        auth_service.revoke_session(token_id, user.id)
+
 
 @router.post("/upload-cv/")
-async def upload_cvs(files: List[UploadFile] = File(description="Selecciona los archivos PDF")):
+async def upload_cvs(
+    files: List[UploadFile] = File(description="Selecciona los archivos PDF"),
+    user: ActiveUser = Depends(get_current_active_user),
+):
     if len(files) > 20:
         raise HTTPException(
             status_code=400,
@@ -68,6 +109,7 @@ async def upload_cvs(files: List[UploadFile] = File(description="Selecciona los 
         with open(file_path, "wb") as f:
             f.write(contents)
 
+        auth_service.assign_resource("cv", file_id, user.id)
         status_service.register_file(file_id)
         uploaded_results.append({
             "file_id": file_id,
@@ -83,7 +125,8 @@ async def upload_cvs(files: List[UploadFile] = File(description="Selecciona los 
 
 
 @router.post("/extract-text/{file_id}")
-def extract_text(file_id: str):
+def extract_text(file_id: str, user: ActiveUser = Depends(get_current_active_user)):
+    require_resource_owner("cv", file_id, user)
     status_service.update_status(file_id, ProcessingStatus.EXTRACTING)
     try:
         result = extract_text_from_pdf_service(file_id)
@@ -150,28 +193,38 @@ def _run_retry_pipeline(file_id: str) -> None:
 
 
 @router.get("/status/{file_id}")
-def get_file_status(file_id: str):
+def get_file_status(file_id: str, user: ActiveUser = Depends(get_current_active_user)):
+    require_resource_owner("cv", file_id, user)
     file_status = status_service.get_status(file_id)
     if file_status is None:
-        raise HTTPException(status_code=404, detail="No se encontró el estado del archivo.")
+        file_status = status_service.register_file(file_id)
     return file_status.as_dict()
 
 
 @router.post("/retry/{file_id}", status_code=status.HTTP_202_ACCEPTED)
-def retry_cv(file_id: str, background_tasks: BackgroundTasks):
+def retry_cv(
+    file_id: str,
+    background_tasks: BackgroundTasks,
+    user: ActiveUser = Depends(get_current_active_user),
+):
+    require_resource_owner("cv", file_id, user)
     get_pdf_path(file_id)
     status_service.update_status(file_id, ProcessingStatus.EXTRACTING)
     background_tasks.add_task(_run_retry_pipeline, file_id)
     return status_service.get_status(file_id).as_dict()
 
 @router.post("/analyze-cv/{file_id}", response_model=CandidateProfileSchema, status_code=status.HTTP_200_OK)
-def analyze_and_normalize_cv(file_id: str):
+def analyze_and_normalize_cv(
+    file_id: str,
+    user: ActiveUser = Depends(get_current_active_user),
+):
     """
     Endpoint que orquesta:
     1. Obtención del texto plano del PDF.
     2. HU-03: Extracción de información clave mediante LLM.
     3. HU-04: Normalización, validación por esquema JSON y manejo de reintentos.
     """
+    require_resource_owner("cv", file_id, user)
     return _process_cv(file_id)
 
 
@@ -181,7 +234,10 @@ def analyze_and_normalize_cv(file_id: str):
     status_code=status.HTTP_201_CREATED,
     summary="Registrar una nueva vacante y estructurar requisitos con LLM (HU-05 / HU-06)"
 )
-def create_vacancy(vacancy_data: VacancyCreate):
+def create_vacancy(
+    vacancy_data: VacancyCreate,
+    user: ActiveUser = Depends(get_current_active_user),
+):
     """
     1. HU-05: Guarda la vacante con estado 'pending_processing'.
     2. HU-06: Llama al LLM para extraer y estructurar los requisitos de la vacante.
@@ -191,6 +247,7 @@ def create_vacancy(vacancy_data: VacancyCreate):
     # 1. Guardar vacante inicial en estado 'pending_processing'
     try:
         saved_vacancy = vacancy_service.create_vacancy(vacancy_data)
+        auth_service.assign_resource("vacancy", str(saved_vacancy.id), user.id)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -224,9 +281,14 @@ def create_vacancy(vacancy_data: VacancyCreate):
 
 
 @router.get("/vacancies/", response_model=List[VacancyResponse])
-def list_vacancies():
+def list_vacancies(user: ActiveUser = Depends(get_current_active_user)):
     """HU-09: entrega las vacantes disponibles para los selectores del frontend."""
-    return vacancy_service.list_vacancies()
+    owned_ids = auth_service.list_owned_resource_ids("vacancy", user.id)
+    return [
+        vacancy
+        for vacancy in vacancy_service.list_vacancies()
+        if str(vacancy.id) in owned_ids
+    ]
 
 
 @router.get("/ranking/{vacancy_id}", response_model=VacancyRankingResponse)
@@ -240,7 +302,9 @@ def get_vacancy_ranking(
         pattern="^(candidate_name|score|experience_years)$",
     ),
     order: str = Query(default="desc", pattern="^(asc|desc)$"),
+    user: ActiveUser = Depends(get_current_active_user),
 ):
+    require_resource_owner("vacancy", vacancy_id, user)
     vacancy = vacancy_service.get_vacancy(vacancy_id)
     if vacancy is None:
         raise HTTPException(status_code=404, detail="No se encontró la vacante.")
@@ -271,7 +335,12 @@ def get_vacancy_ranking(
     response_model=CandidateDetailResponse,
     summary="Consultar el perfil completo y análisis de un candidato (HU-10)",
 )
-def get_candidate_detail(candidate_id: str, vacancy_id: str = Query(...)):
+def get_candidate_detail(
+    candidate_id: str,
+    vacancy_id: str = Query(...),
+    user: ActiveUser = Depends(get_current_active_user),
+):
+    require_resource_owner("vacancy", vacancy_id, user)
     vacancy = vacancy_service.get_vacancy(vacancy_id)
     if vacancy is None:
         raise HTTPException(status_code=404, detail="No se encontró la vacante.")
@@ -295,12 +364,97 @@ def get_candidate_detail(candidate_id: str, vacancy_id: str = Query(...)):
 
 
 @router.post(
+    "/candidates/generate-interview-questions",
+    response_model=InterviewGuideResponse,
+    summary="Generar una guía de entrevista personalizada con IA",
+)
+def generate_interview_questions(
+    guide_request: InterviewGuideRequest,
+    user: ActiveUser = Depends(get_current_active_user),
+):
+    require_resource_owner("vacancy", guide_request.vacancy_id, user)
+    vacancy = vacancy_service.get_vacancy(guide_request.vacancy_id)
+    if vacancy is None:
+        raise HTTPException(status_code=404, detail="No se encontró la vacante.")
+    if vacancy.structured_requirements is None:
+        raise HTTPException(
+            status_code=409,
+            detail="La vacante aún no tiene requisitos estructurados.",
+        )
+
+    try:
+        candidate_detail = ranking_service.get_candidate_detail(
+            candidate_id=guide_request.candidate_id,
+            vacancy_id=guide_request.vacancy_id,
+            vacancy=vacancy,
+        )
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"No fue posible leer el perfil del candidato: {error}",
+        ) from error
+    if candidate_detail is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No se encontró el candidato asociado a esta vacante.",
+        )
+
+    candidate_context = {
+        "nombre": candidate_detail.candidate_name,
+        "cargo_objetivo": candidate_detail.cargo,
+        "experiencia_anios": candidate_detail.experience_years,
+        "habilidades": candidate_detail.skills,
+        "educacion": candidate_detail.education_level,
+        "idiomas": candidate_detail.languages,
+        "experiencia_laboral": [
+            {
+                "cargo": item.get("cargo"),
+                "empresa": item.get("empresa"),
+                "fecha_inicio": item.get("fecha_inicio"),
+                "fecha_fin": item.get("fecha_fin"),
+                "funciones": item.get("funciones", []),
+            }
+            for item in candidate_detail.experience
+        ],
+    }
+    fit_summary = {
+        "score": candidate_detail.score,
+        "resumen": candidate_detail.explanation.justificacion_resumida,
+        "fortalezas": candidate_detail.explanation.puntos_fuertes,
+        "brechas": candidate_detail.explanation.brechas_detectadas,
+    }
+
+    try:
+        return interview_service.generate_guide(
+            candidate=candidate_context,
+            vacancy={
+                "titulo": vacancy.title,
+                **vacancy.structured_requirements.model_dump(),
+            },
+            fit_summary=fit_summary,
+        )
+    except InterviewServiceUnavailable as error:
+        raise HTTPException(
+            status_code=503,
+            detail=str(error),
+        ) from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=502,
+            detail=str(error),
+        ) from error
+
+
+@router.post(
     "/match/",
     response_model=MatchResponse,
     status_code=status.HTTP_200_OK,
     summary="Calcular score y justificar requisitos candidato-vacante (HU-07 / HU-08)",
 )
-def calculate_match(match_request: MatchRequest):
+def calculate_match(
+    match_request: MatchRequest,
+    user: ActiveUser = Depends(get_current_active_user),
+):
     """
     HU-07 / HU-08: Recibe el perfil estructurado de un candidato (HU-04) y
     los requisitos estructurados de una vacante (HU-06), y retorna
@@ -311,6 +465,7 @@ def calculate_match(match_request: MatchRequest):
     """
     vacancy = None
     if match_request.vacancy_id:
+        require_resource_owner("vacancy", match_request.vacancy_id, user)
         vacancy = vacancy_service.get_vacancy(match_request.vacancy_id)
         if vacancy is None:
             raise HTTPException(status_code=404, detail="No se encontró la vacante.")

@@ -9,6 +9,7 @@ from app.schemas.matching import (
 )
 from app.schemas.vacancy import VacancyResponse
 from app.services.ranking_service import ranking_service
+from app.services.auth_service import auth_service
 from app.services.vacancy_service import vacancy_service
 
 client = TestClient(app)
@@ -24,6 +25,9 @@ def test_candidate_detail_returns_profile_and_ai_explanation(tmp_path, monkeypat
     )
     monkeypatch.setattr(vacancy_service, "get_vacancy", lambda _: vacancy)
     monkeypatch.setattr(ranking_service, "storage_dir", tmp_path)
+    auth_service.assign_resource(
+        "vacancy", VACANCY_ID, auth_service.bootstrap_user_id
+    )
     profile = {
         "nombre_completo": "Laura Gómez",
         "correo": "laura@example.test",
@@ -98,7 +102,12 @@ def test_candidate_detail_returns_profile_and_ai_explanation(tmp_path, monkeypat
     assert data["education_level"] == "Profesional universitaria"
     assert data["languages"] == ["Español", "Inglés B2"]
     assert data["score"] == 75
-    assert data["breakdown"]["habilidades"] == {"score": 40, "max_score": 40}
+    assert data["breakdown"] == {
+        "habilidades": {"score": 40, "max_score": 40},
+        "experiencia": {"score": 30, "max_score": 40},
+        "educacion": {"score": 5, "max_score": 10},
+        "idiomas": {"score": 0, "max_score": 10},
+    }
     assert data["cargo"] == "Ingeniera backend"
     assert data["experience"][0]["empresa"] == "Acme"
     assert data["education"][0]["titulo"] == "Ingeniería de Sistemas"
@@ -116,6 +125,9 @@ def test_candidate_detail_returns_404_for_unknown_candidate(tmp_path, monkeypatc
     )
     monkeypatch.setattr(vacancy_service, "get_vacancy", lambda _: vacancy)
     monkeypatch.setattr(ranking_service, "storage_dir", tmp_path)
+    auth_service.assign_resource(
+        "vacancy", VACANCY_ID, auth_service.bootstrap_user_id
+    )
 
     response = client.get(
         f"/candidates/{'a' * 64}/detail",

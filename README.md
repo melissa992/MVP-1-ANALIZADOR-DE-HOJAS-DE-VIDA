@@ -4,10 +4,10 @@ Plataforma modular para la ingesta y extracción de texto de hojas de vida en PD
 
 ## Equipo de desarrollo
 
-- **Brayan Jurado:** Ingesta (HU-01) y extracción de texto (HU-02).
+- **Brayan Jurado:** Ingesta (HU-01), extracción de texto (HU-02), resiliencia de estados (HU-11), autenticación JWT (HU-12) e innovaciones AI Interviewer & Radar Chart (HU-13).
 - **Nicolás Granada:** Procesamiento con LLM y normalización (HU-03 / HU-04).
-- **Camilo López:** Gestión de vacantes y parametrización (HU-05 / HU-06).
-- **Melissa Ocoro:** Motor de matching, scoring y dashboard (HU-07 a HU-10).
+- **Camilo López:** Gestión de vacantes y parametrización (HU-05 / HU-06 / HU-07).
+- **Melissa Ocoró:** Motor de matching, scoring y dashboard (HU-08 a HU-10).
 
 ## Requisitos previos
 
@@ -41,6 +41,73 @@ $env:GEMINI_MODEL = "gemini-3-flash-preview" # opcional
 
 También puedes copiar [.env.example](.env.example) como referencia. No agregues la
 clave real al repositorio.
+
+La API requiere credenciales del reclutador inicial y un secreto JWT. Genera
+un secreto aleatorio de al menos 32 bytes (por ejemplo, en PowerShell:
+`[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))`)
+y configura estas variables en `.env` o en el entorno del servidor:
+
+```env
+INITIAL_RECRUITER_EMAIL=reclutador@empresa.com
+INITIAL_RECRUITER_PASSWORD=una-frase-secreta-de-al-menos-12-caracteres
+JWT_SECRET_KEY=pega-aqui-el-secreto-aleatorio-generado
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+```
+
+La contraseña debe tener al menos 12 caracteres y no más de 72 bytes UTF-8. La cuenta
+se aprovisiona automáticamente; no hay registro público. Su hash bcrypt y las sesiones
+se guardan en `backend/auth.sqlite3`, fuera del repositorio. Al cambiar la contraseña
+configurada y reiniciar el backend, el hash se actualiza y las sesiones anteriores se
+revocan. La primera inicialización asigna los CV, vacantes y rankings existentes a esta
+cuenta.
+
+### Credenciales, tokens y datos locales
+
+- `.env` contiene secretos locales y está excluido por `.gitignore`. El archivo
+  `.env.example` solo incluye nombres de variables y valores vacíos/de ejemplo: nunca
+  pegues credenciales reales en el README, en incidencias, capturas o commits.
+- `.gitignore` evita agregar archivos locales nuevos, pero no deja de versionar archivos
+  que ya estaban en Git; los artefactos ya rastreados deben retirarse del índice antes
+  de que la regla los excluya de los próximos commits.
+- Si una clave de Gemini, contraseña o secreto JWT llega a Git o se comparte por error,
+  considérala comprometida y rótala de inmediato. Borrar el archivo en un commit posterior
+  no elimina el secreto del historial de Git.
+- Las contraseñas no se guardan en texto plano: se almacena su hash bcrypt. El JWT de
+  acceso tiene una duración configurable mediante `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`;
+  las rutas protegidas lo reciben en la cabecera HTTP `Authorization`.
+- El frontend conserva el token en `localStorage`. Cerrar sesión solicita la revocación
+  al backend y elimina el token local. No compartas el token: equivale temporalmente a
+  las credenciales de la sesión. En producción usa HTTPS y protege la aplicación frente
+  a XSS, ya que el almacenamiento local es accesible desde JavaScript del mismo origen.
+- Los registros de reclutador, hashes y sesiones permanecen en `backend/auth.sqlite3`;
+  los PDF, vacantes, perfiles, resultados y estados se guardan en `temp_storage/` según
+  el flujo de la aplicación. Estos datos locales están excluidos de Git, pero no por eso
+  cifrados o respaldados: protege el equipo/servidor y define retención y copias seguras
+  antes de operar con información real.
+- Los recursos se asocian a su reclutador y los endpoints verifican su propiedad. En
+  producción configura un secreto JWT único, HTTPS/TLS, orígenes CORS explícitos y
+  credenciales fuertes; no uses los ejemplos de este documento como credenciales reales.
+
+En producción configura `APP_ENV=production`, define `CORS_ALLOWED_ORIGINS` con los
+orígenes HTTPS reales y sirve la API detrás de HTTPS (TLS 1.2 o superior). Si TLS termina
+en un proxy, configura Uvicorn para confiar únicamente en la IP de ese proxy y este debe
+establecer `X-Forwarded-Proto: https`; la API redirige HTTP a HTTPS y agrega HSTS a las
+respuestas seguras. Nunca uses el secreto de ejemplo ni HTTP en producción.
+
+Las rutas de CV, vacantes, matching, ranking y estado requieren la cabecera
+`Authorization` con un token de acceso.
+El frontend conserva el token en `localStorage`, valida la sesión al abrir la aplicación
+y ofrece **Cerrar sesión**; el backend valida expiración y revocación en cada petición.
+
+## Guía de entrevista asistida por IA
+
+Desde **Ranking de candidatos**, abre **Ver detalle** en un perfil evaluado y selecciona
+**Generar Guía de Entrevista con IA**. La guía contiene preguntas técnicas y
+comportamentales, el objetivo de cada pregunta y una sugerencia de seguimiento; puedes
+copiarla desde el mismo panel. El backend construye la guía usando el candidato y los
+requisitos/análisis guardados para esa vacante. El endpoint `POST
+/candidates/generate-interview-questions` recibe `candidate_id` y `vacancy_id`, requiere
+una sesión autenticada y verifica la propiedad de la vacante antes de llamar a Gemini.
 
 En Windows, si usas el Símbolo del sistema en lugar de PowerShell, activa el entorno con:
 
@@ -93,7 +160,10 @@ al reiniciar el backend, aunque los PDF almacenados se conserven.
 Los resultados asociados a una vacante desde `POST /match/` guardan el perfil estructurado
 y la evaluación de matching en `temp_storage/`. En el dashboard, **Ver Detalle** solicita
 `GET /candidates/{candidate_id}/detail?vacancy_id={vacancy_id}` y muestra la experiencia,
-habilidades, estudios, idiomas, desglose del score, fortalezas, brechas y resumen ejecutivo.
+habilidades, estudios, idiomas, fortalezas, brechas y resumen ejecutivo. El análisis también
+incluye un gráfico radar de hard skills, experiencia, educación e idiomas: cada eje se expresa
+como porcentaje de los puntos máximos de esa categoría, a partir del desglose ya calculado por
+el motor de matching. No se generan puntuaciones inferidas para dimensiones que el motor no evalúa.
 Los rankings guardados antes de esta funcionalidad no contienen la ficha completa; vuelve
 a calcular el matching asociado a la vacante para generar el detalle.
 
@@ -109,18 +179,96 @@ npm run preview
 
 ## Estructura del proyecto
 
-cv-match-ai/
-├── backend/
-│   ├── app/
-│   │   ├── api/          # Endpoints de FastAPI
-│   │   ├── services/     # Lógica de extracción, LLMs y matching
-│   │   ├── models/       # Esquemas de Pydantic
-│   │   └── main.py       # Archivo principal de FastAPI
-│   ├── tests/            # Pruebas unitarias con pytest
-│   └── requirements.txt  # Dependencias de Python
-├── frontend/             # Interfaz web (Next.js / HTML-JS)
-├── docs/                 # Documentación y Bitácora
-│   ├── PRODUCT_BACKLOG.md
-│   └── BITACORA_MVP.md
-├── .gitignore            # Archivos a ignorar por Git
-└── README.md             # Descripción general del proyecto
+```text
+.
+├── .env.example                    # Variables de entorno de referencia, sin secretos reales
+├── .gitignore                      # Excluye secretos, datos locales, cachés y builds
+├── README.md                       # Instalación, uso, seguridad y estructura del proyecto
+├── package-lock.json               # Lockfile npm de la raíz
+├── backend/                        # API, lógica de negocio y pruebas automatizadas
+│   ├── requirements.txt            # Dependencias Python del backend
+│   ├── app/                        # Aplicación FastAPI
+│   │   ├── main.py                 # Inicializa API, middleware y rutas
+│   │   ├── api/                    # Rutas HTTP y dependencias de autorización
+│   │   │   ├── auth_dependencies.py # Identifica y protege el acceso del usuario
+│   │   │   └── endpoints.py         # Login, CV, estados, vacantes, matching y ranking
+│   │   ├── models/                 # Modelos de datos de dominio/compatibilidad
+│   │   │   ├── cv_schema.py        # Estructura validada del perfil extraído del CV
+│   │   │   └── schemas.py          # Archivo legado vacío; contratos actuales en schemas/
+│   │   ├── schemas/                # Contratos Pydantic de entrada y respuesta
+│   │   │   ├── __init__.py         # Reexportaciones de esquemas principales
+│   │   │   ├── auth.py             # Credenciales y respuestas de autenticación
+│   │   │   ├── candidate.py        # Perfil, detalle y explicación del candidato
+│   │   │   ├── interview.py         # Solicitud y guía de entrevista generada
+│   │   │   ├── matching.py         # Score, desglose y evidencia de matching
+│   │   │   ├── ranking.py          # Elementos y respuesta del ranking
+│   │   │   └── vacancy.py          # Datos de vacante y requisitos estructurados
+│   │   └── services/               # Procesamiento y reglas de negocio
+│   │       ├── auth_service.py     # Hash bcrypt, JWT, sesiones y propiedad de recursos
+│   │       ├── extraction_service.py # Almacenamiento temporal y extracción PDF
+│   │       ├── interview_service.py # Generación de guía con Gemini
+│   │       ├── llm_extraction_service.py # Extracción estructurada de perfiles con IA
+│   │       ├── matching_service.py # Evidencias y cálculo de puntajes por categoría
+│   │       ├── normalization_service.py # Normalización del perfil del candidato
+│   │       ├── ranking_service.py  # Persistencia y consulta de rankings/detalles
+│   │       ├── status_service.py   # Ciclo de estados del procesamiento de CV
+│   │       └── vacancy_service.py  # Registro y estructuración de vacantes
+│   └── tests/                      # Pruebas de API y servicios
+│       ├── conftest.py             # Configuración compartida y fixtures de pruebas
+│       ├── test_auth.py            # Autenticación, sesiones y autorización
+│       ├── test_candidate_detail.py # Consulta del detalle del candidato
+│       ├── test_interview.py       # Generación de guías de entrevista
+│       ├── test_matching.py        # Puntajes y validación de evidencias
+│       ├── test_normalization.py   # Normalización de perfiles
+│       ├── test_ranking.py         # Ranking, filtros y persistencia
+│       ├── test_status.py          # Estados, extracción y reintentos
+│       └── test_vacancy.py         # Registro y consulta de vacantes
+├── docs/                           # Guía funcional y documentos de referencia
+│   ├── GUIA_DEL_PROYECTO.md        # Descripción ampliada de los archivos y módulos
+│   ├── MVP 1 - ANALIZADOR DE HOJAS DE VIDA.pdf # Documento base del MVP
+│   └── PROMPT ELABORADO MVP1.pdf   # Prompts de referencia del proyecto
+└── frontend/                       # Aplicación web React con Vite
+    ├── .gitignore                  # Exclusiones locales del frontend
+    ├── package.json                # Dependencias y comandos npm
+    ├── package-lock.json           # Versiones exactas de dependencias frontend
+    ├── index.html                  # Documento HTML de entrada de Vite
+    ├── vite.config.js              # Configuración de Vite y React
+    ├── eslint.config.js            # Reglas de lint del frontend
+    ├── postcss.config.js           # Integración de PostCSS/Tailwind
+    ├── tailwind.config.js          # Configuración de Tailwind CSS
+    ├── README.md                   # README inicial de la plantilla Vite
+    ├── public/                     # Recursos estáticos servidos sin transformación
+    │   ├── favicon.svg              # Icono del sitio
+    │   └── icons.svg                # Iconos SVG compartidos
+    └── src/                        # Código de interfaz y comunicación con la API
+        ├── App.jsx                 # Sesión, navegación y composición de pestañas
+        ├── App.css                 # Estilos de módulos y controles principales
+        ├── index.css               # Estilos globales y base visual
+        ├── main.jsx                # Montaje de React en el documento HTML
+        ├── assets/                 # Imágenes y recursos gráficos importados
+        │   ├── hero.png             # Recurso gráfico incluido en el proyecto
+        │   ├── react.svg            # Recurso de plantilla React
+        │   └── vite.svg             # Recurso de plantilla Vite
+        ├── components/             # Vistas y componentes reutilizables
+        │   ├── VacancyForm.jsx     # Registro de vacantes y requisitos generados
+        │   ├── auth/               # Interfaz de inicio de sesión
+        │   │   ├── Login.jsx       # Formulario de acceso
+        │   │   └── Login.css       # Estilos de acceso
+        │   ├── candidate/          # Detalle del candidato y visualizaciones
+        │   │   ├── CandidateDetailModal.jsx # Perfil, análisis y guía de entrevista
+        │   │   ├── CandidateDetailModal.css # Estilos del detalle del candidato
+        │   │   ├── RadarMatchChart.jsx # Radar SVG de competencias del matching
+        │   │   └── RadarMatchChart.css # Estilos responsive del radar
+        │   ├── matching/            # Evaluación de compatibilidad candidato-vacante
+        │   │   ├── MatchingPanel.jsx # Entrada, cálculo y resultado del matching
+        │   │   └── MatchingPanel.css # Estilos del motor de matching
+        │   └── ranking/             # Búsqueda y comparación de candidatos
+        │       ├── RankingDashboard.jsx # Filtros, orden y tabla de candidatos
+        │       └── RankingDashboard.css # Estilos del ranking
+        └── services/
+            └── api.js               # Peticiones HTTP y gestión local del token
+```
+
+El backend genera `temp_storage/` para PDFs y registros JSON, y `backend/auth.sqlite3`
+para usuarios, sesiones y propiedad de recursos. Son datos locales excluidos de Git;
+consulta [docs/GUIA_DEL_PROYECTO.md](docs/GUIA_DEL_PROYECTO.md) para más detalle por módulo.

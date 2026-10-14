@@ -116,7 +116,7 @@ export default function RankingDashboard() {
     <section className="ranking-dashboard" aria-label="Dashboard de ranking de candidatos">
       <div className="ranking-dashboard-heading">
         <div>
-          <p className="ranking-eyebrow">RANKING DE CANDIDATOS · HU-09</p>
+          <p className="ranking-eyebrow">GESTIÓN DE TALENTO / Dashboard</p>
           <h2>Comparativo de talento</h2>
           <p>Filtra, ordena y revisa candidatos evaluados para cada vacante.</p>
         </div>

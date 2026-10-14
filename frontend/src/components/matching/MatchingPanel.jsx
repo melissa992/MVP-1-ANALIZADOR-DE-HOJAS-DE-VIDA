@@ -248,7 +248,7 @@ export default function MatchingPanel() {
           <JsonTextarea
             id="candidate-json"
             label="Perfil del Candidato (JSON)"
-            hint="Pega el JSON estructurado del candidato (salida de HU-04 / Analizar con IA)."
+            hint="Pega el perfil estructurado del candidato generado al analizar su hoja de vida."
             value={candidateRaw}
             onChange={setCandidateRaw}
             error={candidateErr}
@@ -256,7 +256,7 @@ export default function MatchingPanel() {
           <JsonTextarea
             id="vacancy-json"
             label="Requisitos de la Vacante (JSON)"
-            hint="Pega los requisitos estructurados de la vacante (structured_requirements de HU-06)."
+            hint="Pega los requisitos estructurados generados al registrar la vacante."
             value={vacancyRaw}
             onChange={(value) => {
               setVacancyRaw(value);
@@ -270,7 +270,7 @@ export default function MatchingPanel() {
             Asociar resultado al ranking (opcional)
           </label>
           <p className="json-hint">
-            Selecciona una vacante procesada para guardar el resultado en su dashboard HU-09.
+            Selecciona una vacante procesada para guardar el resultado en su ranking.
           </p>
           <select
             id="matching-vacancy"
@@ -348,7 +348,7 @@ export default function MatchingPanel() {
 
           <div className="match-result-header">
             <div>
-              <p className="match-result-eyebrow">MATCHING ENGINE · HU-07 / HU-08</p>
+              <p className="match-result-eyebrow">MATCHING ENGINE · Evaluación</p>
               <h3 className="match-result-title">Resultado de Idoneidad</h3>
             </div>
             <span className="match-result-badge" style={{ background: colors.bg, color: colors.text, borderColor: colors.ring + '60' }}>
