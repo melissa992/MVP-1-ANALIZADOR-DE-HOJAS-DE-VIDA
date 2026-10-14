@@ -481,6 +481,7 @@
   min-width: 0;
   min-height: 50px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 7px 9px;
@@ -498,6 +499,49 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.processing-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-pending,
+.status-extracting,
+.status-analyzing {
+  color: #8a6416;
+  background: #fff6dc;
+}
+
+.status-completed {
+  color: #356c46;
+  background: #eaf5ec;
+}
+
+.status-failed {
+  color: #9b4438;
+  background: #fff0ed;
+}
+
+.status-spinner {
+  width: 12px;
+  height: 12px;
+  animation: spin 0.9s linear infinite;
+}
+
+.status-error-message {
+  flex: 0 0 100%;
+  margin: -4px 0 2px 40px;
+  color: #9b4438;
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 .file-actions {
@@ -537,6 +581,17 @@
   color: #66756b;
   border-color: #e5ebe6;
   background: #fff;
+}
+
+.retry-button {
+  color: #9b4438;
+  border-color: #efd5ce;
+  background: #fff8f5;
+}
+
+.retry-button:hover:not(:disabled) {
+  border-color: #d99a8a;
+  background: #fff0ed;
 }
 
 .extract-button:disabled {

@@ -1,10 +1,13 @@
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+import logging
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, UploadFile, status
 from typing import List
 import json
 import os
 import uuid
 from app.services.extraction_service import extract_text_from_pdf_service
+from app.services.extraction_service import get_pdf_path
 from app.services.llm_extraction_service import LLMServiceUnavailable
+from app.services.status_service import ProcessingStatus, status_service
 from app.services.normalization_service import normalization_service
 from app.services.vacancy_service import vacancy_service
 from app.services.matching_service import matching_service
@@ -18,6 +21,7 @@ from app.services.ranking_service import ranking_service
 router = APIRouter()
 UPLOAD_DIR = "temp_storage"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+logger = logging.getLogger(__name__)
 
 @router.post("/upload-cv/")
 async def upload_cvs(files: List[UploadFile] = File(description="Selecciona los archivos PDF")):
@@ -63,7 +67,8 @@ async def upload_cvs(files: List[UploadFile] = File(description="Selecciona los 
         file_path = os.path.join(UPLOAD_DIR, f"{file_id}.pdf")
         with open(file_path, "wb") as f:
             f.write(contents)
-            
+
+        status_service.register_file(file_id)
         uploaded_results.append({
             "file_id": file_id,
             "filename": file.filename,
@@ -79,7 +84,85 @@ async def upload_cvs(files: List[UploadFile] = File(description="Selecciona los 
 
 @router.post("/extract-text/{file_id}")
 def extract_text(file_id: str):
-    return extract_text_from_pdf_service(file_id)
+    status_service.update_status(file_id, ProcessingStatus.EXTRACTING)
+    try:
+        result = extract_text_from_pdf_service(file_id)
+        if result["status"] == "warning":
+            status_service.update_status(
+                file_id,
+                ProcessingStatus.FAILED,
+                result["message"],
+            )
+        else:
+            status_service.update_status(file_id, ProcessingStatus.PENDING)
+        return result
+    except HTTPException as error:
+        status_service.update_status(
+            file_id,
+            ProcessingStatus.FAILED,
+            str(error.detail),
+        )
+        raise
+
+
+def _process_cv(file_id: str):
+    try:
+        status_service.update_status(file_id, ProcessingStatus.EXTRACTING)
+        extraction_result = extract_text_from_pdf_service(file_id)
+        raw_text = extraction_result.get("extracted_text", "")
+
+        if not raw_text or not raw_text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="El archivo PDF no contiene texto extraíble o está vacío.",
+            )
+
+        status_service.update_status(file_id, ProcessingStatus.ANALYZING)
+        profile = normalization_service.process_and_normalize(raw_text)
+        status_service.update_status(file_id, ProcessingStatus.COMPLETED)
+        return profile
+    except HTTPException as error:
+        status_service.update_status(
+            file_id,
+            ProcessingStatus.FAILED,
+            str(error.detail),
+        )
+        raise
+    except LLMServiceUnavailable as error:
+        detail = str(error)
+        status_service.update_status(file_id, ProcessingStatus.FAILED, detail)
+        raise HTTPException(status_code=503, detail=detail) from error
+    except ValueError as error:
+        detail = f"Error de estructuración en el CV: {str(error)}"
+        status_service.update_status(file_id, ProcessingStatus.FAILED, detail)
+        raise HTTPException(status_code=422, detail=detail) from error
+    except Exception as error:
+        detail = f"Error interno en el procesamiento del CV: {str(error)}"
+        status_service.update_status(file_id, ProcessingStatus.FAILED, detail)
+        raise HTTPException(status_code=500, detail=detail) from error
+
+
+def _run_retry_pipeline(file_id: str) -> None:
+    try:
+        _process_cv(file_id)
+    except HTTPException:
+        logger.exception("El reintento de procesamiento falló para el archivo %s", file_id)
+
+
+@router.get("/status/{file_id}")
+def get_file_status(file_id: str):
+    file_status = status_service.get_status(file_id)
+    if file_status is None:
+        raise HTTPException(status_code=404, detail="No se encontró el estado del archivo.")
+    return file_status.as_dict()
+
+
+@router.post("/retry/{file_id}", status_code=status.HTTP_202_ACCEPTED)
+def retry_cv(file_id: str, background_tasks: BackgroundTasks):
+    get_pdf_path(file_id)
+    status_service.update_status(file_id, ProcessingStatus.EXTRACTING)
+    background_tasks.add_task(_run_retry_pipeline, file_id)
+    return status_service.get_status(file_id).as_dict()
 
 @router.post("/analyze-cv/{file_id}", response_model=CandidateProfileSchema, status_code=status.HTTP_200_OK)
 def analyze_and_normalize_cv(file_id: str):
@@ -89,38 +172,7 @@ def analyze_and_normalize_cv(file_id: str):
     2. HU-03: Extracción de información clave mediante LLM.
     3. HU-04: Normalización, validación por esquema JSON y manejo de reintentos.
     """
-    try:
-        # Extraer texto base del archivo PDF almacenado
-        extraction_result = extract_text_from_pdf_service(file_id)
-        raw_text = extraction_result.get("extracted_text", "")
-        
-        if not raw_text or len(raw_text.strip()) == 0:
-            raise HTTPException(
-                status_code=400, 
-                detail="El archivo PDF no contiene texto extraíble o está vacío."
-            )
-
-        # Ejecutar el flujo secuencial de Extracción (HU-03) + Normalización (HU-04)
-        structured_and_normalized_profile = normalization_service.process_and_normalize(raw_text)
-
-        return structured_and_normalized_profile
-
-    except HTTPException:
-        raise
-    except LLMServiceUnavailable as lue:
-        raise HTTPException(status_code=503, detail=str(lue)) from lue
-    except ValueError as ve:
-        # Error específico de normalización o esquemas (HU-04)
-        raise HTTPException(
-            status_code=422, 
-            detail=f"Error de estructuración en el CV: {str(ve)}"
-        )
-    except Exception as e:
-        # Errores generales de servidor o LLM (HU-03)
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error interno en el procesamiento del CV: {str(e)}"
-        )
+    return _process_cv(file_id)
 
 
 @router.post(

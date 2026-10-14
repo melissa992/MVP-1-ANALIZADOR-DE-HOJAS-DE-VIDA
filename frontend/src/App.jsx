@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './App.css';
 import VacancyForm from './components/VacancyForm';
 import MatchingPanel from './components/matching/MatchingPanel';
 import RankingDashboard from './components/ranking/RankingDashboard';
+import { API_BASE_URL, getFileStatus, retryFileProcessing } from './services/api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('cvs');
@@ -14,7 +15,56 @@ function App() {
   const [extractingFileId, setExtractingFileId] = useState(null);
   const [profileView, setProfileView] = useState(null);
   const [analyzingFileId, setAnalyzingFileId] = useState(null);
+  const [fileStatuses, setFileStatuses] = useState({});
+  const [retryingFileId, setRetryingFileId] = useState(null);
   const [showRawProfile, setShowRawProfile] = useState(false);
+
+  useEffect(() => {
+    const activeFileIds = Object.entries(fileStatuses)
+      .filter(([, fileStatus]) => ['EXTRACTING', 'ANALYZING'].includes(fileStatus.status))
+      .map(([fileId]) => fileId);
+    if (activeFileIds.length === 0) return undefined;
+
+    let isActive = true;
+    const pollStatuses = async () => {
+      const results = await Promise.all(
+        activeFileIds.map(async (fileId) => {
+          try {
+            return [fileId, await getFileStatus(fileId)];
+          } catch (error) {
+            setErrorMsg(`No fue posible consultar el estado de ${fileId}: ${error.message}`);
+            return null;
+          }
+        }),
+      );
+
+      if (!isActive) return;
+      setFileStatuses((current) => {
+        let changed = false;
+        const updated = { ...current };
+        results.forEach((result) => {
+          if (!result) return;
+          const [fileId, nextStatus] = result;
+          const previousStatus = current[fileId];
+          if (
+            previousStatus?.status !== nextStatus.status ||
+            previousStatus?.error_message !== nextStatus.error_message
+          ) {
+            updated[fileId] = nextStatus;
+            changed = true;
+          }
+        });
+        return changed ? updated : current;
+      });
+    };
+
+    const intervalId = window.setInterval(pollStatuses, 1000);
+    pollStatuses();
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+    };
+  }, [fileStatuses]);
 
   const handleFileSelect = (e) => {
     const selected = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
@@ -28,6 +78,7 @@ function App() {
     }
     setErrorMsg('');
     setFiles(selected);
+    setFileStatuses({});
     setResponseResult(null);
     setExtractionView(null);
     setProfileView(null);
@@ -42,6 +93,7 @@ function App() {
     }
     setErrorMsg('');
     setFiles(dropped);
+    setFileStatuses({});
     setResponseResult(null);
     setExtractionView(null);
     setProfileView(null);
@@ -58,7 +110,7 @@ function App() {
     });
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/upload-cv/', {
+      const res = await fetch(`${API_BASE_URL}/upload-cv/`, {
         method: 'POST',
         body: formData,
       });
@@ -67,6 +119,16 @@ function App() {
       if (!res.ok) throw new Error(data.detail || 'Error en el servidor');
 
       setResponseResult(data);
+      setFileStatuses(
+        Object.fromEntries(
+          (data.results || [])
+            .filter((uploadedFile) => uploadedFile.file_id)
+            .map((uploadedFile) => [
+              uploadedFile.file_id,
+              { status: 'PENDING', error_message: null },
+            ]),
+        ),
+      );
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -77,17 +139,27 @@ function App() {
   const handleExtractText = async (uploadedFile) => {
     setExtractionView({ filename: uploadedFile.filename, loading: true });
     setExtractingFileId(uploadedFile.file_id);
+    setFileStatuses((current) => ({
+      ...current,
+      [uploadedFile.file_id]: { status: 'EXTRACTING', error_message: null },
+    }));
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/extract-text/${encodeURIComponent(uploadedFile.file_id)}`, {
+      const res = await fetch(`${API_BASE_URL}/extract-text/${encodeURIComponent(uploadedFile.file_id)}`, {
         method: 'POST',
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'No fue posible extraer el texto.');
 
       setExtractionView({ filename: uploadedFile.filename, data });
+      const fileStatus = await getFileStatus(uploadedFile.file_id);
+      setFileStatuses((current) => ({ ...current, [uploadedFile.file_id]: fileStatus }));
     } catch (err) {
       setExtractionView({ filename: uploadedFile.filename, error: err.message });
+      setFileStatuses((current) => ({
+        ...current,
+        [uploadedFile.file_id]: { status: 'FAILED', error_message: err.message },
+      }));
     } finally {
       setExtractingFileId(null);
     }
@@ -97,21 +169,63 @@ function App() {
     setProfileView({ filename: uploadedFile.filename, loading: true });
     setAnalyzingFileId(uploadedFile.file_id);
     setShowRawProfile(false);
+    setErrorMsg('');
+    setFileStatuses((current) => ({
+      ...current,
+      [uploadedFile.file_id]: { status: 'EXTRACTING', error_message: null },
+    }));
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/analyze-cv/${encodeURIComponent(uploadedFile.file_id)}`, {
+      const res = await fetch(`${API_BASE_URL}/analyze-cv/${encodeURIComponent(uploadedFile.file_id)}`, {
         method: 'POST',
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'No fue posible analizar el CV.');
 
       setProfileView({ filename: uploadedFile.filename, data });
+      setFileStatuses((current) => ({
+        ...current,
+        [uploadedFile.file_id]: { status: 'COMPLETED', error_message: null },
+      }));
     } catch (err) {
       setProfileView({ filename: uploadedFile.filename, error: err.message });
+      setFileStatuses((current) => ({
+        ...current,
+        [uploadedFile.file_id]: { status: 'FAILED', error_message: err.message },
+      }));
     } finally {
       setAnalyzingFileId(null);
     }
   };
+
+  const handleRetry = async (uploadedFile) => {
+    setRetryingFileId(uploadedFile.file_id);
+    setErrorMsg('');
+    setFileStatuses((current) => ({
+      ...current,
+      [uploadedFile.file_id]: { status: 'EXTRACTING', error_message: null },
+    }));
+
+    try {
+      const fileStatus = await retryFileProcessing(uploadedFile.file_id);
+      setFileStatuses((current) => ({ ...current, [uploadedFile.file_id]: fileStatus }));
+    } catch (err) {
+      setFileStatuses((current) => ({
+        ...current,
+        [uploadedFile.file_id]: { status: 'FAILED', error_message: err.message },
+      }));
+    } finally {
+      setRetryingFileId(null);
+    }
+  };
+
+  const getStatusLabel = (status) => ({
+    PENDING: 'En cola',
+    EXTRACTING: 'Extrayendo',
+    ANALYZING: 'Analizando',
+    COMPLETED: 'Completado',
+    FAILED: 'Error',
+  }[status] || status);
 
   return (
     <div className="app-shell">
@@ -312,24 +426,66 @@ function App() {
                           </span>
                           <span className="uploaded-file-name" title={uploadedFile.filename}>{uploadedFile.filename}</span>
                           {uploadedFile.status === 'success' ? (
-                            <div className="file-actions">
-                              <button
-                                type="button"
-                                className="extract-button"
-                                onClick={() => handleAnalyzeProfile(uploadedFile)}
-                                disabled={Boolean(extractingFileId || analyzingFileId)}
-                              >
-                                {analyzingFileId === uploadedFile.file_id ? 'Analizando...' : 'Analizar con IA'}
-                              </button>
-                              <button
-                                type="button"
-                                className="extract-button extract-button-secondary"
-                                onClick={() => handleExtractText(uploadedFile)}
-                                disabled={Boolean(extractingFileId || analyzingFileId)}
-                              >
-                                {extractingFileId === uploadedFile.file_id ? 'Extrayendo...' : 'Ver texto extraído'}
-                              </button>
-                            </div>
+                            <>
+                              {fileStatuses[uploadedFile.file_id] && (
+                                <div
+                                  className={`processing-status status-${fileStatuses[uploadedFile.file_id].status.toLowerCase()}`}
+                                  title={fileStatuses[uploadedFile.file_id].error_message || undefined}
+                                  role="status"
+                                >
+                                  {['PENDING', 'EXTRACTING', 'ANALYZING'].includes(fileStatuses[uploadedFile.file_id].status) && (
+                                    <svg className="status-spinner" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity=".25" />
+                                      <path fill="currentColor" d="M12 3a9 9 0 00-9 9h3a6 6 0 016-6V3z" />
+                                    </svg>
+                                  )}
+                                  {getStatusLabel(fileStatuses[uploadedFile.file_id].status)}
+                                </div>
+                              )}
+                              {fileStatuses[uploadedFile.file_id]?.status === 'FAILED' && (
+                                <span className="status-error-message">
+                                  {fileStatuses[uploadedFile.file_id].error_message}
+                                </span>
+                              )}
+                              <div className="file-actions">
+                                {fileStatuses[uploadedFile.file_id]?.status === 'FAILED' && (
+                                  <button
+                                    type="button"
+                                    className="extract-button retry-button"
+                                    onClick={() => handleRetry(uploadedFile)}
+                                    disabled={Boolean(retryingFileId || extractingFileId || analyzingFileId)}
+                                  >
+                                    {retryingFileId === uploadedFile.file_id ? 'Reintentando...' : '🔄 Reintentar'}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="extract-button"
+                                  onClick={() => handleAnalyzeProfile(uploadedFile)}
+                                  disabled={Boolean(
+                                    extractingFileId ||
+                                    analyzingFileId ||
+                                    retryingFileId ||
+                                    ['EXTRACTING', 'ANALYZING'].includes(fileStatuses[uploadedFile.file_id]?.status),
+                                  )}
+                                >
+                                  {analyzingFileId === uploadedFile.file_id ? 'Analizando...' : 'Analizar con IA'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="extract-button extract-button-secondary"
+                                  onClick={() => handleExtractText(uploadedFile)}
+                                  disabled={Boolean(
+                                    extractingFileId ||
+                                    analyzingFileId ||
+                                    retryingFileId ||
+                                    ['EXTRACTING', 'ANALYZING'].includes(fileStatuses[uploadedFile.file_id]?.status),
+                                  )}
+                                >
+                                  {extractingFileId === uploadedFile.file_id ? 'Extrayendo...' : 'Ver texto extraído'}
+                                </button>
+                              </div>
+                            </>
                           ) : (
                             <span className="upload-status-error" title={uploadedFile.message}>No se pudo cargar</span>
                           )}

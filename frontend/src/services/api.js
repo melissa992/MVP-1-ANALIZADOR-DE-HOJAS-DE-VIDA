@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 /**
  * Registra una nueva vacante en el sistema (HU-05).
@@ -152,10 +152,45 @@ export async function getCandidateDetail(candidateId, vacancyId) {
   return data;
 }
 
+export async function getFileStatus(fileId) {
+  const response = await fetch(`${API_BASE_URL}/status/${encodeURIComponent(fileId)}`, {
+    headers: { Accept: 'application/json' },
+  });
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: No fue posible consultar el estado del archivo.`,
+    );
+  }
+
+  return data;
+}
+
+export async function retryFileProcessing(fileId) {
+  const response = await fetch(`${API_BASE_URL}/retry/${encodeURIComponent(fileId)}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  });
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: No fue posible reintentar el procesamiento.`,
+    );
+  }
+
+  return data;
+}
+
 export default {
   createVacancy,
   calculateMatch,
   listVacancies,
   getVacancyRanking,
   getCandidateDetail,
+  getFileStatus,
+  retryFileProcessing,
 };
