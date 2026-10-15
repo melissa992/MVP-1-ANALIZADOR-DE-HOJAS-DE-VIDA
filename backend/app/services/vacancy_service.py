@@ -10,6 +10,7 @@ from uuid import UUID
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from app.storage import STORAGE_DIR
 
 from app.schemas.vacancy import (
     VacancyCreate,
@@ -19,7 +20,7 @@ from app.schemas.vacancy import (
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-DEFAULT_STORAGE_DIR = "temp_storage"
+DEFAULT_STORAGE_DIR = str(STORAGE_DIR)
 
 
 class VacancyService:

@@ -2,8 +2,9 @@ import os
 from uuid import UUID
 import pdfplumber
 from fastapi import HTTPException
+from app.storage import STORAGE_DIR
 
-UPLOAD_DIR = "temp_storage"
+UPLOAD_DIR = str(STORAGE_DIR)
 
 
 def get_pdf_path(file_id: str) -> str:

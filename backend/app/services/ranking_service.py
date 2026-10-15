@@ -12,6 +12,7 @@ from app.schemas.candidate import (
 )
 from app.schemas.ranking import CandidateRankingItem, VacancyRankingResponse
 from app.schemas.vacancy import VacancyResponse
+from app.storage import STORAGE_DIR
 
 SortField = Literal["candidate_name", "score", "experience_years"]
 SortOrder = Literal["asc", "desc"]
@@ -20,7 +21,7 @@ SortOrder = Literal["asc", "desc"]
 class RankingService:
     """Lee y persiste resultados de matching junto a las vacantes de temp_storage."""
 
-    def __init__(self, storage_dir: str = "temp_storage") -> None:
+    def __init__(self, storage_dir: str = str(STORAGE_DIR)) -> None:
         self.storage_dir = Path(storage_dir)
 
     def get_vacancy_ranking(
