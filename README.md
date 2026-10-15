@@ -61,6 +61,38 @@ configurada y reiniciar el backend, el hash se actualiza y las sesiones anterior
 revocan. La primera inicialización asigna los CV, vacantes y rankings existentes a esta
 cuenta.
 
+### Despliegue en Vercel y Render
+
+El frontend se despliega en Vercel y la API FastAPI en Render. El backend usa un disco
+persistente de Render para conservar la base SQLite de autenticación y los archivos
+subidos. El servicio de Render debe permanecer en una sola instancia al usar ese disco.
+
+1. Sube los cambios a GitHub y crea un proyecto Vercel desde el repositorio. Configura
+   `frontend` como **Root Directory**; Vercel detecta Vite y usa `npm run build` con
+   `dist` como salida.
+2. Despliega primero el frontend para obtener su dominio, por ejemplo
+   `https://mi-proyecto.vercel.app`.
+3. En Render, crea un **Blueprint** desde el mismo repositorio y selecciona
+   `render.yaml`. En la configuración del servicio completa las variables que el Blueprint
+   solicita:
+   - `CORS_ALLOWED_ORIGINS`: el origen de Vercel, sin barra final. Añade también el
+     dominio personalizado si lo utilizas.
+   - `INITIAL_RECRUITER_EMAIL`: el correo que usarás para iniciar sesión.
+   - `INITIAL_RECRUITER_PASSWORD`: una contraseña de 12 a 72 bytes UTF-8.
+   - `JWT_SECRET_KEY`: un secreto aleatorio de al menos 32 bytes; no reutilices una clave
+     de ejemplo.
+   - `GEMINI_API_KEY`: tu clave de Gemini para las funciones de análisis.
+4. Cuando Render muestre la URL pública de la API, en Vercel agrega la variable
+   `VITE_API_BASE_URL` con esa URL (sin barra final) y vuelve a desplegar el frontend.
+5. Abre el dominio de Vercel e inicia sesión con el correo y contraseña que configuraste
+   en Render.
+
+No uses un plan de Render sin disco persistente para este backend: la base SQLite contiene
+usuarios y sesiones, y el sistema guarda archivos en `APP_STORAGE_DIR`. El Blueprint monta
+el disco en `/var/data`; no escales el servicio a varias instancias con este almacenamiento
+local. Si cambias el dominio del frontend, actualiza `CORS_ALLOWED_ORIGINS` en Render y
+reinicia o vuelve a desplegar el servicio.
+
 ### Credenciales, tokens y datos locales
 
 - `.env` contiene secretos locales y está excluido por `.gitignore`. El archivo
@@ -79,11 +111,11 @@ cuenta.
   al backend y elimina el token local. No compartas el token: equivale temporalmente a
   las credenciales de la sesión. En producción usa HTTPS y protege la aplicación frente
   a XSS, ya que el almacenamiento local es accesible desde JavaScript del mismo origen.
-- Los registros de reclutador, hashes y sesiones permanecen en `backend/auth.sqlite3`;
-  los PDF, vacantes, perfiles, resultados y estados se guardan en `temp_storage/` según
-  el flujo de la aplicación. Estos datos locales están excluidos de Git, pero no por eso
-  cifrados o respaldados: protege el equipo/servidor y define retención y copias seguras
-  antes de operar con información real.
+- En local, los registros de reclutador, hashes y sesiones permanecen en
+  `backend/auth.sqlite3`; los PDF, vacantes, perfiles y resultados se guardan en
+  `temp_storage/`. En Render, `AUTH_DATABASE_PATH` y `APP_STORAGE_DIR` apuntan al disco
+  persistente montado en `/var/data`. Estos datos no están cifrados ni respaldados por
+  defecto: define retención y copias seguras antes de operar con información real.
 - Los recursos se asocian a su reclutador y los endpoints verifican su propiedad. En
   producción configura un secreto JWT único, HTTPS/TLS, orígenes CORS explícitos y
   credenciales fuertes; no uses los ejemplos de este documento como credenciales reales.

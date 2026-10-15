@@ -11,6 +11,7 @@ from typing import Generator
 import jwt
 from dotenv import load_dotenv
 from passlib.context import CryptContext
+from app.storage import STORAGE_DIR
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
@@ -298,5 +299,6 @@ auth_service.assign_legacy_resources(
         Path.cwd() / "temp_storage",
         _BACKEND_DIR / "temp_storage",
         _REPOSITORY_DIR / "temp_storage",
+        STORAGE_DIR,
     }
 )

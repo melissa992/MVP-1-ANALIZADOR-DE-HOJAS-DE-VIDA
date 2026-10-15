@@ -7,6 +7,7 @@ import os
 import uuid
 from app.services.extraction_service import extract_text_from_pdf_service
 from app.services.extraction_service import get_pdf_path
+from app.storage import STORAGE_DIR
 from app.api.auth_dependencies import get_current_active_user, require_resource_owner
 from app.schemas.auth import LoginRequest, TokenResponse, UserResponse
 from app.services.auth_service import ActiveUser, auth_service
@@ -25,7 +26,7 @@ from app.services.interview_service import InterviewServiceUnavailable, intervie
 from app.services.ranking_service import ranking_service
 
 router = APIRouter()
-UPLOAD_DIR = "temp_storage"
+UPLOAD_DIR = str(STORAGE_DIR)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 logger = logging.getLogger(__name__)
 bearer_scheme = HTTPBearer(auto_error=False)

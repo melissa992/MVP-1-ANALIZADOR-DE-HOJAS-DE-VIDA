@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: cv-match-api
+    runtime: python
+    plan: starter
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    disk:
+      name: cv-match-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_STORAGE_DIR
+        value: /var/data/temp_storage
+      - key: AUTH_DATABASE_PATH
+        value: /var/data/auth.sqlite3
+      - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: INITIAL_RECRUITER_EMAIL
+        sync: false
+      - key: INITIAL_RECRUITER_PASSWORD
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
