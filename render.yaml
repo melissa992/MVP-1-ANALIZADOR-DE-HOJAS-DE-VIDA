@@ -21,7 +21,7 @@ services:
       - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
         value: "60"
       - key: CORS_ALLOWED_ORIGINS
-        sync: false
+        value: https://mvp-1-analizador-de-hojas-de-vida.vercel.app
       - key: GEMINI_API_KEY
         sync: false
       - key: INITIAL_RECRUITER_EMAIL

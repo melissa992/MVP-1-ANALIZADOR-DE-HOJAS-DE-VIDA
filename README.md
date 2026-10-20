@@ -75,13 +75,14 @@ subidos. El servicio de Render debe permanecer en una sola instancia al usar ese
 3. En Render, crea un **Blueprint** desde el mismo repositorio y selecciona
    `render.yaml`. En la configuración del servicio completa las variables que el Blueprint
    solicita:
-   - `CORS_ALLOWED_ORIGINS`: el origen de Vercel, sin barra final. Añade también el
-     dominio personalizado si lo utilizas.
    - `INITIAL_RECRUITER_EMAIL`: el correo que usarás para iniciar sesión.
    - `INITIAL_RECRUITER_PASSWORD`: una contraseña de 12 a 72 bytes UTF-8.
    - `JWT_SECRET_KEY`: un secreto aleatorio de al menos 32 bytes; no reutilices una clave
      de ejemplo.
    - `GEMINI_API_KEY`: tu clave de Gemini para las funciones de análisis.
+   El Blueprint configura `CORS_ALLOWED_ORIGINS` para el dominio de Vercel del proyecto.
+   Si usas un dominio personalizado o cambias el dominio de Vercel, actualiza esa variable
+   en Render con los orígenes permitidos, separados por comas y sin barras finales.
 4. Cuando Render muestre la URL pública de la API, en Vercel agrega la variable
    `VITE_API_BASE_URL` con esa URL (sin barra final) y vuelve a desplegar el frontend.
 5. Abre el dominio de Vercel e inicia sesión con el correo y contraseña que configuraste
