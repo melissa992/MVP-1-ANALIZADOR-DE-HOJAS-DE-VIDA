@@ -1,7 +1,7 @@
 import logging
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from typing import List
+from typing import Any, List
 import json
 import os
 import uuid
@@ -21,8 +21,21 @@ from app.schemas.vacancy import VacancyCreate, VacancyResponse
 from app.schemas.matching import MatchRequest, MatchResponse
 from app.schemas.ranking import VacancyRankingResponse
 from app.schemas.candidate import CandidateDetailResponse
-from app.schemas.interview import InterviewGuideRequest, InterviewGuideResponse
+from app.schemas.interview import (
+    InterviewEvaluationResponse,
+    InterviewGuideRequest,
+    InterviewGuideResponse,
+    InterviewRespondRequest,
+    InterviewSessionQuestion,
+    InterviewStartRequest,
+    InterviewStartResponse,
+    InterviewTTSRequest,
+)
 from app.services.interview_service import InterviewServiceUnavailable, interview_service
+from app.services.elevenlabs_service import (
+    ElevenLabsServiceUnavailable,
+    elevenlabs_service,
+)
 from app.services.ranking_service import ranking_service
 
 router = APIRouter()
@@ -373,57 +386,11 @@ def generate_interview_questions(
     guide_request: InterviewGuideRequest,
     user: ActiveUser = Depends(get_current_active_user),
 ):
-    require_resource_owner("vacancy", guide_request.vacancy_id, user)
-    vacancy = vacancy_service.get_vacancy(guide_request.vacancy_id)
-    if vacancy is None:
-        raise HTTPException(status_code=404, detail="No se encontró la vacante.")
-    if vacancy.structured_requirements is None:
-        raise HTTPException(
-            status_code=409,
-            detail="La vacante aún no tiene requisitos estructurados.",
-        )
-
-    try:
-        candidate_detail = ranking_service.get_candidate_detail(
-            candidate_id=guide_request.candidate_id,
-            vacancy_id=guide_request.vacancy_id,
-            vacancy=vacancy,
-        )
-    except (OSError, ValueError, KeyError, TypeError) as error:
-        raise HTTPException(
-            status_code=500,
-            detail=f"No fue posible leer el perfil del candidato: {error}",
-        ) from error
-    if candidate_detail is None:
-        raise HTTPException(
-            status_code=404,
-            detail="No se encontró el candidato asociado a esta vacante.",
-        )
-
-    candidate_context = {
-        "nombre": candidate_detail.candidate_name,
-        "cargo_objetivo": candidate_detail.cargo,
-        "experiencia_anios": candidate_detail.experience_years,
-        "habilidades": candidate_detail.skills,
-        "educacion": candidate_detail.education_level,
-        "idiomas": candidate_detail.languages,
-        "experiencia_laboral": [
-            {
-                "cargo": item.get("cargo"),
-                "empresa": item.get("empresa"),
-                "fecha_inicio": item.get("fecha_inicio"),
-                "fecha_fin": item.get("fecha_fin"),
-                "funciones": item.get("funciones", []),
-            }
-            for item in candidate_detail.experience
-        ],
-    }
-    fit_summary = {
-        "score": candidate_detail.score,
-        "resumen": candidate_detail.explanation.justificacion_resumida,
-        "fortalezas": candidate_detail.explanation.puntos_fuertes,
-        "brechas": candidate_detail.explanation.brechas_detectadas,
-    }
+    vacancy, _, candidate_context, fit_summary = _get_interview_context(
+        guide_request.candidate_id,
+        guide_request.vacancy_id,
+        user,
+    )
 
     try:
         return interview_service.generate_guide(
@@ -444,6 +411,168 @@ def generate_interview_questions(
             status_code=502,
             detail=str(error),
         ) from error
+
+
+def _get_interview_context(
+    candidate_id: str,
+    vacancy_id: str,
+    user: ActiveUser,
+) -> tuple[VacancyResponse, CandidateDetailResponse, dict[str, Any], dict[str, Any]]:
+    require_resource_owner("vacancy", vacancy_id, user)
+    vacancy = vacancy_service.get_vacancy(vacancy_id)
+    if vacancy is None:
+        raise HTTPException(status_code=404, detail="No se encontró la vacante.")
+    if vacancy.structured_requirements is None:
+        raise HTTPException(
+            status_code=409,
+            detail="La vacante aún no tiene requisitos estructurados.",
+        )
+
+    try:
+        candidate = ranking_service.get_candidate_detail(
+            candidate_id=candidate_id,
+            vacancy_id=vacancy_id,
+            vacancy=vacancy,
+        )
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"No fue posible leer el perfil del candidato: {error}",
+        ) from error
+    if candidate is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No se encontró el candidato asociado a esta vacante.",
+        )
+
+    candidate_context = {
+        "nombre": candidate.candidate_name,
+        "cargo_objetivo": candidate.cargo,
+        "experiencia_anios": candidate.experience_years,
+        "habilidades": candidate.skills,
+        "educacion": candidate.education_level,
+        "idiomas": candidate.languages,
+        "experiencia_laboral": [
+            {
+                "cargo": item.get("cargo"),
+                "empresa": item.get("empresa"),
+                "fecha_inicio": item.get("fecha_inicio"),
+                "fecha_fin": item.get("fecha_fin"),
+                "funciones": item.get("funciones", []),
+            }
+            for item in candidate.experience
+        ],
+    }
+    fit_summary = {
+        "score": candidate.score,
+        "resumen": candidate.explanation.justificacion_resumida,
+        "fortalezas": candidate.explanation.puntos_fuertes,
+        "brechas": candidate.explanation.brechas_detectadas,
+    }
+    return vacancy, candidate, candidate_context, fit_summary
+
+
+@router.post(
+    "/interview/start",
+    response_model=InterviewStartResponse,
+    summary="Iniciar simulación de entrevista por voz",
+)
+def start_voice_interview(
+    request: InterviewStartRequest,
+    user: ActiveUser = Depends(get_current_active_user),
+):
+    vacancy, candidate, candidate_context, fit_summary = _get_interview_context(
+        request.candidate_id,
+        request.vacancy_id,
+        user,
+    )
+    try:
+        guide = interview_service.generate_guide(
+            candidate=candidate_context,
+            vacancy={
+                "titulo": vacancy.title,
+                **vacancy.structured_requirements.model_dump(),
+            },
+            fit_summary=fit_summary,
+        )
+    except InterviewServiceUnavailable as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    questions = [
+        InterviewSessionQuestion(
+            question=item.question,
+            objective=item.objective,
+            category="Técnica",
+        )
+        for item in guide.technical_questions[:3]
+    ]
+    questions.extend(
+        InterviewSessionQuestion(
+            question=item.question,
+            objective=item.objective,
+            category="Comportamental",
+        )
+        for item in guide.behavioral_questions[:1]
+    )
+    opening_text = (
+        f"Hola, {candidate.candidate_name}. Bienvenido a tu simulación de entrevista "
+        f"para {vacancy.title}. {questions[0].question}"
+    )
+    return InterviewStartResponse(
+        candidate_name=candidate.candidate_name,
+        vacancy_title=vacancy.title,
+        questions=questions,
+        opening_text=opening_text,
+    )
+
+
+@router.post(
+    "/interview/respond",
+    response_model=InterviewEvaluationResponse,
+    summary="Evaluar una respuesta de entrevista",
+)
+def respond_to_voice_interview(
+    request: InterviewRespondRequest,
+    user: ActiveUser = Depends(get_current_active_user),
+):
+    vacancy, _, candidate_context, _ = _get_interview_context(
+        request.candidate_id,
+        request.vacancy_id,
+        user,
+    )
+    try:
+        return interview_service.evaluate_answer(
+            candidate=candidate_context,
+            vacancy={
+                "titulo": vacancy.title,
+                **vacancy.structured_requirements.model_dump(),
+            },
+            question=request.question,
+            objective=request.objective,
+            answer=request.answer,
+        )
+    except InterviewServiceUnavailable as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+
+@router.post(
+    "/interview/tts",
+    responses={200: {"content": {"audio/mpeg": {}}}},
+    summary="Sintetizar voz de entrevista con ElevenLabs",
+)
+def synthesize_interview_voice(
+    request: InterviewTTSRequest,
+    user: ActiveUser = Depends(get_current_active_user),
+):
+    try:
+        audio = elevenlabs_service.synthesize(request.text)
+    except ElevenLabsServiceUnavailable as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    return Response(content=audio, media_type="audio/mpeg")
 
 
 @router.post(

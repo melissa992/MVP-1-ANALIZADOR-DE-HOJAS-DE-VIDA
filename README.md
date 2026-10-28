@@ -37,6 +37,7 @@ clave de API en el entorno:
 ```powershell
 $env:GEMINI_API_KEY = "tu-clave-de-gemini"
 $env:GEMINI_MODEL = "gemini-3-flash-preview" # opcional
+$env:ELEVENLABS_API_KEY = "tu-clave-de-elevenlabs"
 ```
 
 También puedes copiar [.env.example](.env.example) como referencia. No agregues la
@@ -80,6 +81,7 @@ subidos. El servicio de Render debe permanecer en una sola instancia al usar ese
    - `JWT_SECRET_KEY`: un secreto aleatorio de al menos 32 bytes; no reutilices una clave
      de ejemplo.
    - `GEMINI_API_KEY`: tu clave de Gemini para las funciones de análisis.
+   - `ELEVENLABS_API_KEY`: tu clave de ElevenLabs para la voz del entrevistador.
    El Blueprint configura `CORS_ALLOWED_ORIGINS` para el dominio de Vercel del proyecto.
    Si usas un dominio personalizado o cambias el dominio de Vercel, actualiza esa variable
    en Render con los orígenes permitidos, separados por comas y sin barras finales.
@@ -132,15 +134,26 @@ Las rutas de CV, vacantes, matching, ranking y estado requieren la cabecera
 El frontend conserva el token en `localStorage`, valida la sesión al abrir la aplicación
 y ofrece **Cerrar sesión**; el backend valida expiración y revocación en cada petición.
 
-## Guía de entrevista asistida por IA
+## Simulador de entrevista por voz (HU-13)
 
 Desde **Ranking de candidatos**, abre **Ver detalle** en un perfil evaluado y selecciona
-**Generar Guía de Entrevista con IA**. La guía contiene preguntas técnicas y
-comportamentales, el objetivo de cada pregunta y una sugerencia de seguimiento; puedes
-copiarla desde el mismo panel. El backend construye la guía usando el candidato y los
-requisitos/análisis guardados para esa vacante. El endpoint `POST
-/candidates/generate-interview-questions` recibe `candidate_id` y `vacancy_id`, requiere
-una sesión autenticada y verifica la propiedad de la vacante antes de llamar a Gemini.
+**Iniciar Simulación de Entrevista por Voz**. Gemini genera preguntas técnicas y
+comportamentales basadas en el perfil y las brechas de la vacante; ElevenLabs sintetiza
+las preguntas y el feedback. La respuesta se transcribe con Web Speech API en navegadores
+compatibles (Chrome/Edge); también se puede escribir. Cada respuesta se evalúa con Gemini
+y al finalizar se presenta el puntaje promedio, el radar de evaluación y la transcripción.
+
+Configura `GEMINI_API_KEY` y `ELEVENLABS_API_KEY` en el entorno del backend. La voz se
+puede personalizar con `ELEVENLABS_VOICE_ID` y `ELEVENLABS_MODEL`; el identificador de voz
+por defecto es una voz multilingüe de ElevenLabs. La transcripción de voz se ejecuta en el
+navegador; la aplicación envía el texto reconocido al backend para evaluación, no el audio
+del micrófono. Web Speech puede requerir conexión y permiso de micrófono del navegador.
+
+Los endpoints `POST /interview/start`, `POST /interview/respond` y `POST /interview/tts`
+requieren sesión autenticada. Inicio y evaluación verifican que el usuario sea propietario
+de la vacante y recuperan el perfil almacenado; el servicio TTS devuelve audio `audio/mpeg`.
+La guía de preguntas tradicional permanece disponible mediante **Generar Guía de Entrevista
+con IA** y se puede copiar desde la ficha.
 
 En Windows, si usas el Símbolo del sistema en lugar de PowerShell, activa el entorno con:
 
