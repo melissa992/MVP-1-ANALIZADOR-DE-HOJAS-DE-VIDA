@@ -24,6 +24,12 @@ services:
         value: https://mvp-1-analizador-de-hojas-de-vida.vercel.app
       - key: GEMINI_API_KEY
         sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        value: EXAVITQu4vr4xnSDxMaL
+      - key: ELEVENLABS_MODEL
+        value: eleven_multilingual_v2
       - key: INITIAL_RECRUITER_EMAIL
         sync: false
       - key: INITIAL_RECRUITER_PASSWORD

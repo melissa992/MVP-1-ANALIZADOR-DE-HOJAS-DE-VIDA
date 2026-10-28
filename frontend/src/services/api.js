@@ -245,6 +245,75 @@ export async function generateInterviewGuide(candidateId, vacancyId) {
   return data;
 }
 
+export async function startVoiceInterview(candidateId, vacancyId) {
+  const response = await apiFetch('/interview/start', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ candidate_id: candidateId, vacancy_id: vacancyId }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: No fue posible iniciar la entrevista.`,
+    );
+  }
+  return data;
+}
+
+export async function respondToVoiceInterview({
+  candidateId,
+  vacancyId,
+  question,
+  objective,
+  answer,
+}) {
+  const response = await apiFetch('/interview/respond', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      candidate_id: candidateId,
+      vacancy_id: vacancyId,
+      question,
+      objective,
+      answer,
+    }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: No fue posible evaluar la respuesta.`,
+    );
+  }
+  return data;
+}
+
+export async function synthesizeInterviewVoice(text) {
+  const response = await apiFetch('/interview/tts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'audio/mpeg',
+    },
+    body: JSON.stringify({ text }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(
+      (typeof data?.detail === 'string' && data.detail) ||
+      `Error ${response.status}: No fue posible generar el audio.`,
+    );
+  }
+  return response.blob();
+}
+
 export async function getFileStatus(fileId) {
   const response = await apiFetch(`/status/${encodeURIComponent(fileId)}`, {
     headers: { Accept: 'application/json' },

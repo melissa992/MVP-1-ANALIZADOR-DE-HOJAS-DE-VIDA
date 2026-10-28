@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { generateInterviewGuide, getCandidateDetail } from '../../services/api';
 import RadarMatchChart from './RadarMatchChart';
+import VoiceInterviewModal from './VoiceInterviewModal';
 import './CandidateDetailModal.css';
 
 function DetailSection({ title, children }) {
@@ -19,6 +20,8 @@ function CandidateDetailModal({ candidateId, vacancyId, onClose }) {
   const [interviewLoading, setInterviewLoading] = useState(false);
   const [interviewError, setInterviewError] = useState('');
   const [copyMessage, setCopyMessage] = useState('');
+  const [voiceInterviewOpen, setVoiceInterviewOpen] = useState(false);
+  const closeVoiceInterview = useCallback(() => setVoiceInterviewOpen(false), []);
   const candidate = result?.candidateId === candidateId ? result.data : null;
   const error = requestError?.candidateId === candidateId ? requestError.message : '';
   const loading = !candidate && !error;
@@ -79,11 +82,11 @@ function CandidateDetailModal({ candidateId, vacancyId, onClose }) {
 
   useEffect(() => {
     const closeOnEscape = (event) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && !voiceInterviewOpen) onClose();
     };
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  }, [onClose, voiceInterviewOpen]);
 
   return (
     <div className="candidate-modal-backdrop" onClick={onClose}>
@@ -216,6 +219,14 @@ function CandidateDetailModal({ candidateId, vacancyId, onClose }) {
               </p>
               <button
                 type="button"
+                className="voice-interview-launch-button"
+                onClick={() => setVoiceInterviewOpen(true)}
+              >
+                <span aria-hidden="true">◉</span>
+                Iniciar Simulación de Entrevista por Voz
+              </button>
+              <button
+                type="button"
                 className="interview-generate-button"
                 onClick={handleGenerateInterviewGuide}
                 disabled={interviewLoading}
@@ -257,6 +268,13 @@ function CandidateDetailModal({ candidateId, vacancyId, onClose }) {
               )}
             </DetailSection>
           </div>
+        )}
+        {voiceInterviewOpen && (
+          <VoiceInterviewModal
+            candidateId={candidateId}
+            vacancyId={vacancyId}
+            onClose={closeVoiceInterview}
+          />
         )}
       </section>
     </div>
